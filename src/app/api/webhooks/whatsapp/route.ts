@@ -1,31 +1,116 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { parseCommand, getHelpText } from '@/lib/whatsapp/bot-commands'
-import { sendWhatsAppMessage } from '@/lib/whatsapp/client'
-import { handleStatusCommand } from '@/lib/whatsapp/bot-handlers'
-import { handleFollowupCommand } from '@/lib/whatsapp/bot-handlers'
-import { handleAddClientCommand } from '@/lib/whatsapp/bot-handlers'
-import { handleMarkPaidCommand } from '@/lib/whatsapp/bot-handlers'
+import { findOrCreateUserByPhone, getOnboardingMessage, completeUserSetup } from '@/lib/whatsapp/user-linking'
+
+async function sendTextMessage(to: string, text: string) {
+  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID
+  const accessToken = process.env.WHATSAPP_ACCESS_TOKEN
+
+  if (!phoneNumberId || !accessToken) {
+    console.error('WhatsApp credentials not configured')
+    return
+  }
+
+  const response = await fetch(
+    `https://graph.facebook.com/v18.0/${phoneNumberId}/messages`,
+    {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        messaging_product: 'whatsapp',
+        to,
+        type: 'text',
+        text: { body: text },
+      }),
+    }
+  )
+
+  if (!response.ok) {
+    const error = await response.json()
+    console.error('WhatsApp send error:', error)
+  }
+}
+
+async function handleBotCommand(from: string, text: string) {
+  const supabase = createClient()
+
+  const { userId, isNew, needsSetup } = await findOrCreateUserByPhone(from)
+
+  if (needsSetup) {
+    const setupMatch = text.match(/^setup\s+(.+?)\s+(.+)$/i)
+    if (setupMatch) {
+      const [, name, email] = setupMatch
+      const result = await completeUserSetup(userId, name.trim(), email.trim())
+      if (result.success) {
+        await sendTextMessage(from, `✅ Setup complete! Welcome, ${name}! Send HELP to get started.`)
+      } else {
+        await sendTextMessage(from, `❌ Setup failed: ${result.error}. Please try again.`)
+      }
+      return
+    }
+    await sendTextMessage(from, getOnboardingMessage())
+    return
+  }
+
+  const parsed = parseCommand(text)
+
+  switch (parsed.command) {
+    case 'help':
+      await sendTextMessage(from, getHelpText())
+      break
+    case 'status':
+      await sendTextMessage(from, '📊 Status feature coming soon!')
+      break
+    case 'followup':
+      await sendTextMessage(from, '📤 Follow-up feature coming soon!')
+      break
+    case 'followup_specific':
+      await sendTextMessage(from, `📤 Follow-up for "${parsed.params.clientName}" coming soon!`)
+      break
+    case 'add_client':
+      await sendTextMessage(from, '📝 Add client feature coming soon!')
+      break
+    case 'mark_paid':
+      await sendTextMessage(from, `💰 Marking invoice "${parsed.params.invoiceNumber}" as paid coming soon!`)
+      break
+    case 'stop':
+      await sendTextMessage(from, '🔕 Notifications paused. Send HELP to resume.')
+      break
+    case 'unknown':
+      await sendTextMessage(from, `❓ Unknown command. Send HELP for available commands.\n\nYou said: "${text}"`)
+      break
+  }
+}
 
 export async function POST(request: NextRequest) {
   const body = await request.json()
 
   const entry = body.entry?.[0]
-  if (!entry) return NextResponse.json({ status: 'ignored' })
+  if (!entry) {
+    return NextResponse.json({ status: 'ignored' })
+  }
 
   const changes = entry.changes?.[0]
-  if (!changes) return NextResponse.json({ status: 'ignored' })
+  if (!changes) {
+    return NextResponse.json({ status: 'ignored' })
+  }
 
   const { value } = changes
+  const statuses = value.statuses || []
+
   const supabase = createClient()
 
-  // Handle status updates (delivered, read, failed)
-  const statuses = value.statuses || []
   for (const status of statuses) {
     const { id: whatsappMessageId, status: deliveryStatus } = status
+
     if (!whatsappMessageId) continue
 
     const now = new Date().toISOString()
+
     let update: Record<string, string> = {}
 
     switch (deliveryStatus) {
@@ -36,37 +121,34 @@ export async function POST(request: NextRequest) {
         update = { read_at: now, status: 'read' }
         break
       case 'failed':
-        update = { status: 'failed', error_message: status.errors?.[0]?.message || 'Unknown error' }
+        update = {
+          status: 'failed',
+          error_message: status.errors?.[0]?.message || 'Unknown error',
+        }
         break
     }
 
     if (Object.keys(update).length > 0) {
-      await supabase.from('reminders').update(update).eq('whatsapp_message_id', whatsappMessageId)
+      await supabase
+        .from('reminders')
+        .update(update)
+        .eq('whatsapp_message_id', whatsappMessageId)
     }
   }
 
-  // Handle incoming messages
   const messages = value.messages || []
   for (const message of messages) {
-    const { from, id: messageId, timestamp } = message
-    if (!messageId || !timestamp || message.type !== 'text') continue
+    const { id: messageId, timestamp } = message
 
-    const text = message.text?.body
-    if (!text) continue
+    if (message.type === 'text' && message.text?.body) {
+      const from = message.from
+      const text = message.text.body
+      await handleBotCommand(from, text)
+    }
 
-    // Check if sender is a registered user
-    const { data: user } = await supabase
-      .from('users')
-      .select('id, name, email')
-      .eq('phone', from)
-      .single()
-
-    if (user) {
-      // This is a bot command from a registered user
-      await handleBotCommand(supabase, user, text, from)
-    } else {
-      // This is a client reply — track it
+    if (messageId && timestamp) {
       const respondedAt = new Date(parseInt(timestamp) * 1000).toISOString()
+
       await supabase
         .from('reminders')
         .update({ responded_at: respondedAt, status: 'responded' })
@@ -77,69 +159,6 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({ status: 'ok' })
 }
 
-async function handleBotCommand(supabase: any, user: any, text: string, from: string) {
-  const parsed = parseCommand(text)
-
-  switch (parsed.command) {
-    case 'help':
-      await replyToUser(supabase, from, getHelpText())
-      break
-
-    case 'status':
-      const statusResponse = await handleStatusCommand(supabase, user.id)
-      await replyToUser(supabase, from, statusResponse)
-      break
-
-    case 'followup':
-      const followupResponse = await handleFollowupCommand(supabase, user.id, null)
-      await replyToUser(supabase, from, followupResponse)
-      break
-
-    case 'followup_specific':
-      const specificResponse = await handleFollowupCommand(supabase, user.id, parsed.params.clientName!)
-      await replyToUser(supabase, from, specificResponse)
-      break
-
-    case 'add_client':
-      const addResponse = await handleAddClientCommand(supabase, user.id, parsed.params)
-      await replyToUser(supabase, from, addResponse)
-      break
-
-    case 'mark_paid':
-      const paidResponse = await handleMarkPaidCommand(supabase, user.id, parsed.params.invoiceNumber!)
-      await replyToUser(supabase, from, paidResponse)
-      break
-
-    case 'stop':
-      await supabase.from('users').update({ plan: 'paused' }).eq('id', user.id)
-      await replyToUser(supabase, from, '⏸️ Notifications paused. Send HELP to resume.')
-      break
-
-    case 'unknown':
-      await replyToUser(supabase, from, `I didn't understand that. Send HELP for available commands.`)
-      break
-  }
-}
-
-async function replyToUser(supabase: any, to: string, message: string) {
-  try {
-    await sendWhatsAppMessage({
-      phoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID!,
-      to,
-      templateName: 'paychase_response',
-      language: 'en',
-      components: [{
-        type: 'body',
-        parameters: [{ type: 'text', text: message }],
-      }],
-      accessToken: process.env.WHATSAPP_ACCESS_TOKEN!,
-    })
-  } catch (error) {
-    console.error('Failed to reply to user:', error)
-  }
-}
-
-// WhatsApp webhook verification (GET request)
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const mode = searchParams.get('hub.mode')
