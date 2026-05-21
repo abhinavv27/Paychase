@@ -9,6 +9,7 @@ import {
   Settings,
   LogOut,
   Menu,
+  CheckCircle,
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -16,6 +17,7 @@ const navItems = [
   { href: '/', label: 'Overview', icon: LayoutDashboard },
   { href: '/clients', label: 'Clients', icon: Users },
   { href: '/invoices', label: 'Invoices', icon: FileText },
+  { href: '/approvals', label: 'Approvals', icon: CheckCircle },
   { href: '/insights', label: 'Insights', icon: Brain },
   { href: '/analytics', label: 'Analytics', icon: BarChart3 },
   { href: '/settings', label: 'Settings', icon: Settings },
@@ -29,12 +31,28 @@ async function getUser() {
   return user
 }
 
+async function getDraftCount() {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return 0
+
+  const { count, error } = await supabase
+    .from('reminders')
+    .select('*', { count: 'exact', head: true })
+    .eq('user_id', user.id)
+    .eq('approval_status', 'draft')
+
+  if (error) return 0
+  return count || 0
+}
+
 export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
   const user = await getUser()
+  const draftCount = await getDraftCount()
 
   if (!user) {
     redirect('/login')
@@ -76,6 +94,11 @@ export default async function DashboardLayout({
             >
               <item.icon className="w-5 h-5 text-gray-500" />
               {item.label}
+              {item.href === '/approvals' && draftCount > 0 && (
+                <span className="ml-auto inline-flex items-center justify-center px-2 py-0.5 text-xs font-bold leading-none text-white bg-blue-600 rounded-full">
+                  {draftCount}
+                </span>
+              )}
             </Link>
           ))}
         </nav>
