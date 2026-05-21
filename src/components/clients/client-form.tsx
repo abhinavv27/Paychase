@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useActionState } from 'react'
+import { useState } from 'react'
+import { useFormState } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { createClientAction } from '@/lib/clients-actions'
 import type { Database } from '@/lib/supabase/types'
@@ -18,7 +19,7 @@ export function ClientForm({ initialData, mode = 'add' }: ClientFormProps) {
   const router = useRouter()
   const [consentChecked, setConsentChecked] = useState(false)
 
-  const [state, formAction, isPending] = useActionState(
+  const [state, formAction, isPending] = useFormState(
     async (_prev: { error?: string } | undefined, formData: FormData) => {
       if (!consentChecked) {
         return { error: 'You must confirm client consent to proceed' }

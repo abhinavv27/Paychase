@@ -1,9 +1,11 @@
 import Razorpay from 'razorpay'
 
-const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID!,
-  key_secret: process.env.RAZORPAY_KEY_SECRET!,
-})
+function getRazorpay(): Razorpay {
+  return new Razorpay({
+    key_id: process.env.RAZORPAY_KEY_ID || '',
+    key_secret: process.env.RAZORPAY_KEY_SECRET || '',
+  })
+}
 
 export async function createPaymentLink(params: {
   amount: number
@@ -20,6 +22,7 @@ export async function createPaymentLink(params: {
   short_url: string
   status: string
 }> {
+  const razorpay = getRazorpay()
   const paymentLink = await razorpay.paymentLink.create({
     amount: params.amount * 100,
     currency: params.currency,
@@ -57,6 +60,7 @@ export async function fetchPaymentLink(linkId: string): Promise<{
     amount: number
   }>
 }> {
+  const razorpay = getRazorpay()
   const paymentLink = await razorpay.paymentLink.fetch(linkId)
   const rawPayments = paymentLink.payments as unknown as Array<{ id: string; status: string; amount: number | string }> | undefined
   return {

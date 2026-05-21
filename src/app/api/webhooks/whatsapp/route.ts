@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
   const supabase = createClient()
 
   for (const status of statuses) {
-    const { id: whatsappMessageId, status: deliveryStatus, recipient_id } = status
+    const { id: whatsappMessageId, status: deliveryStatus } = status
 
     if (!whatsappMessageId) continue
 
@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
 
   const messages = value.messages || []
   for (const message of messages) {
-    const { from, id: messageId, timestamp } = message
+    const { id: messageId, timestamp } = message
 
     if (messageId && timestamp) {
       const respondedAt = new Date(parseInt(timestamp) * 1000).toISOString()
