@@ -11,7 +11,7 @@ describe('calculateOptimalSendHour', () => {
   }
 
   it('returns default hour 10 when fewer than 10 reminders', () => {
-    const reminders = Array.from({ length: 5 }, (_, i) => makeReminder(14))
+    const reminders = Array.from({ length: 5 }, () => makeReminder(14))
     expect(calculateOptimalSendHour(reminders)).toBe(10)
   })
 

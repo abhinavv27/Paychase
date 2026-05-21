@@ -16,7 +16,7 @@ export function renderReminderTemplate(params: {
   language?: string
   upiLink?: string
 }): string {
-  const { clientName, invoiceNumber, amount, dueDate, daysOverdue, tone, language = 'en', upiLink } = params
+  const { clientName, invoiceNumber, amount, dueDate, daysOverdue, tone, upiLink } = params
 
   const templates: Record<SentimentTone, string> = {
     friendly: `Hey ${clientName}! 👋 Just a friendly reminder about invoice ${invoiceNumber} for ₹${amount}${daysOverdue > 0 ? ` (due ${daysOverdue} days ago)` : ` (due ${dueDate})`}. No rush, just didn't want it to slip your mind!${upiLink ? ` Pay here: ${upiLink}` : ''}`,
