@@ -47,10 +47,13 @@ export async function POST(request: NextRequest) {
   )
 
   // Link invoices to clients
-  const invoicesWithClientIds = validation.invoices.map((inv) => ({
-    ...inv,
-    client_id: clientNameToId.get(inv.user_id) || '',
-  }))
+  const invoicesWithClientIds = validation.invoices.map((inv) => {
+    const { _clientName, ...invoiceData } = inv
+    return {
+      ...invoiceData,
+      client_id: clientNameToId.get(_clientName.toLowerCase()) || '',
+    }
+  })
 
   // Import invoices
   if (invoicesWithClientIds.length > 0) {
