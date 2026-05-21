@@ -15,10 +15,14 @@ export interface CsvRow {
   due_date?: string
 }
 
+export interface InvoiceInsertWithClientName extends InvoiceInsert {
+  _clientName: string
+}
+
 export interface ValidationResult {
   valid: boolean
   clients: ClientInsert[]
-  invoices: InvoiceInsert[]
+  invoices: InvoiceInsertWithClientName[]
   errors: { row: number; field: string; message: string }[]
   warnings: { row: number; field: string; message: string }[]
 }
@@ -27,7 +31,7 @@ export function validateCsvContent(content: string, userId: string): ValidationR
   const errors: { row: number; field: string; message: string }[] = []
   const warnings: { row: number; field: string; message: string }[] = []
   const clients: ClientInsert[] = []
-  const invoices: InvoiceInsert[] = []
+  const invoices: InvoiceInsertWithClientName[] = []
 
   let records: CsvRow[]
   try {
@@ -110,7 +114,8 @@ export function validateCsvContent(content: string, userId: string): ValidationR
         issue_date: issueDate,
         due_date: dueDate,
         status: 'pending',
-      })
+        _clientName: row.name,
+      } as InvoiceInsertWithClientName)
     }
   }
 
