@@ -1,4 +1,25 @@
 import { createClient } from '@/lib/supabase/server'
+import { ActionBanner } from '@/components/dashboard/action-banner'
+
+function formatINR(amount: number): string {
+  return new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency: 'INR',
+    maximumFractionDigits: 0,
+  }).format(amount)
+}
+
+function timeAgo(date: string): string {
+  const now = new Date()
+  const then = new Date(date)
+  const seconds = Math.floor((now.getTime() - then.getTime()) / 1000)
+
+  if (seconds < 60) return 'just now'
+  if (seconds < 3600) return `${Math.floor(seconds / 60)} minutes ago`
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)} hours ago`
+  if (seconds < 604800) return `${Math.floor(seconds / 86400)} days ago`
+  return then.toLocaleDateString()
+}
 
 export default async function OverviewPage() {
   const supabase = createClient()
@@ -6,63 +27,72 @@ export default async function OverviewPage() {
     data: { user },
   } = await supabase.auth.getUser()
 
-  const stats = [
-    {
-      label: 'Total Outstanding',
-      value: '₹12,45,000',
-      change: '+12%',
-      positive: false,
-    },
-    {
-      label: 'Cash Flow Forecast',
-      value: '₹8,32,000',
-      change: '+8%',
-      positive: true,
-    },
-    {
-      label: 'Recovery Rate',
-      value: '73.2%',
-      change: '+5.1%',
-      positive: true,
-    },
-    {
-      label: 'Avg Collection Time',
-      value: '18 days',
-      change: '-3 days',
-      positive: true,
-    },
-  ]
+  const today = new Date().toISOString().split('T')[0]
+  const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+  const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()
 
-  const recentActivity = [
-    {
-      id: 1,
-      action: 'Payment received',
-      client: 'Acme Corp',
-      amount: '₹45,000',
-      time: '2 hours ago',
-    },
-    {
-      id: 2,
-      action: 'Invoice overdue',
-      client: 'Beta Industries',
-      amount: '₹1,20,000',
-      time: '5 hours ago',
-    },
-    {
-      id: 3,
-      action: 'AI prediction updated',
-      client: 'Gamma Ltd',
-      amount: '₹78,500',
-      time: '1 day ago',
-    },
-    {
-      id: 4,
-      action: 'Payment plan created',
-      client: 'Delta Services',
-      amount: '₹2,10,000',
-      time: '2 days ago',
-    },
-  ]
+  const [
+    draftCountResult,
+    invoicesResult,
+    overdueResult,
+    sentThisWeekResult,
+    paymentsResult,
+    recentRemindersResult,
+    overdueClientsResult,
+  ] = await Promise.all([
+    supabase
+      .from('reminders')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user!.id)
+      .eq('approval_status', 'draft'),
+    supabase
+      .from('invoices')
+      .select('amount, status')
+      .eq('user_id', user!.id),
+    supabase
+      .from('invoices')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user!.id)
+      .eq('status', 'pending')
+      .lt('due_date', today),
+    supabase
+      .from('reminders')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user!.id)
+      .eq('approval_status', 'sent')
+      .gte('sent_at', weekAgo),
+    supabase
+      .from('payments')
+      .select('amount')
+      .eq('user_id', user!.id)
+      .gte('captured_at', monthStart),
+    supabase
+      .from('reminders')
+      .select('*, invoices(invoice_number, amount), clients(name)')
+      .eq('user_id', user!.id)
+      .order('created_at', { ascending: false })
+      .limit(5),
+    supabase
+      .from('clients')
+      .select('name, total_outstanding, risk_score')
+      .eq('user_id', user!.id)
+      .gt('total_outstanding', 0)
+      .order('total_outstanding', { ascending: false })
+      .limit(3),
+  ])
+
+  const draftCount = draftCountResult.count ?? 0
+  const totalOutstanding =
+    invoicesResult.data
+      ?.filter((i) => i.status === 'pending')
+      .reduce((sum, i) => sum + i.amount, 0) ?? 0
+  const overdueCount = overdueResult.count ?? 0
+  const sentThisWeek = sentThisWeekResult.count ?? 0
+  const collectedThisMonth =
+    paymentsResult.data?.reduce((sum, p) => sum + p.amount, 0) ?? 0
+
+  const recentActivity = recentRemindersResult.data ?? []
+  const topOverdueClients = overdueClientsResult.data ?? []
 
   return (
     <div className="space-y-8">
@@ -72,33 +102,49 @@ export default async function OverviewPage() {
           Welcome back, {user?.email?.split('@')[0] || 'User'}
         </h1>
         <p className="mt-1 text-sm text-gray-500">
-          Here&apos;s what&apos;s happening with your receivables today.
+          Here&apos;s what you need to do right now.
         </p>
       </div>
 
-      {/* Stats cards */}
+      {/* Action Banner */}
+      <ActionBanner draftCount={draftCount} />
+
+      {/* Quick Stats Row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {stats.map((stat) => (
-          <div
-            key={stat.label}
-            className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm"
-          >
-            <p className="text-sm font-medium text-gray-500">{stat.label}</p>
-            <p className="mt-2 text-3xl font-bold text-gray-900">
-              {stat.value}
-            </p>
-            <p
-              className={`mt-1 text-sm font-medium ${
-                stat.positive ? 'text-green-600' : 'text-red-600'
-              }`}
-            >
-              {stat.change} from last month
-            </p>
-          </div>
-        ))}
+        <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+          <p className="text-sm font-medium text-gray-500">Total Outstanding</p>
+          <p className="mt-2 text-3xl font-bold text-gray-900">
+            {formatINR(totalOutstanding)}
+          </p>
+          <p className="mt-1 text-sm text-gray-500">Pending invoices</p>
+        </div>
+
+        <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+          <p className="text-sm font-medium text-gray-500">Overdue Invoices</p>
+          <p className="mt-2 text-3xl font-bold text-red-600">
+            {overdueCount}
+          </p>
+          <p className="mt-1 text-sm text-gray-500">Past due date</p>
+        </div>
+
+        <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+          <p className="text-sm font-medium text-gray-500">Messages Sent This Week</p>
+          <p className="mt-2 text-3xl font-bold text-gray-900">
+            {sentThisWeek}
+          </p>
+          <p className="mt-1 text-sm text-gray-500">Last 7 days</p>
+        </div>
+
+        <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+          <p className="text-sm font-medium text-gray-500">Collected This Month</p>
+          <p className="mt-2 text-3xl font-bold text-green-600">
+            {formatINR(collectedThisMonth)}
+          </p>
+          <p className="mt-1 text-sm text-gray-500">Payments received</p>
+        </div>
       </div>
 
-      {/* Recent activity */}
+      {/* Recent Activity */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
         <div className="px-6 py-4 border-b border-gray-200">
           <h2 className="text-lg font-semibold text-gray-900">
@@ -106,25 +152,104 @@ export default async function OverviewPage() {
           </h2>
         </div>
         <div className="divide-y divide-gray-200">
-          {recentActivity.map((activity) => (
-            <div
-              key={activity.id}
-              className="px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
-            >
-              <div>
-                <p className="text-sm font-medium text-gray-900">
-                  {activity.action}
-                </p>
-                <p className="text-sm text-gray-500">{activity.client}</p>
-              </div>
-              <div className="text-right">
-                <p className="text-sm font-medium text-gray-900">
-                  {activity.amount}
-                </p>
-                <p className="text-xs text-gray-500">{activity.time}</p>
-              </div>
+          {recentActivity.length === 0 ? (
+            <div className="px-6 py-8 text-center text-sm text-gray-500">
+              No recent activity yet.
             </div>
-          ))}
+          ) : (
+            recentActivity.map((reminder) => {
+              const statusLabel =
+                reminder.approval_status === 'draft'
+                  ? 'Draft created'
+                  : reminder.approval_status === 'sent'
+                    ? 'Reminder sent'
+                    : reminder.approval_status === 'approved'
+                      ? 'Approved'
+                      : reminder.status
+              const relativeTime = reminder.created_at
+                ? timeAgo(reminder.created_at)
+                : 'Unknown'
+
+              return (
+                <div
+                  key={reminder.id}
+                  className="px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
+                >
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">
+                      {statusLabel}
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      {reminder.clients?.name ?? 'Unknown client'}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-medium text-gray-900">
+                      {formatINR(reminder.invoices?.amount ?? 0)}
+                    </p>
+                    <p className="text-xs text-gray-500">{relativeTime}</p>
+                  </div>
+                </div>
+              )
+            })
+          )}
+        </div>
+      </div>
+
+      {/* Top Overdue Clients */}
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
+        <div className="px-6 py-4 border-b border-gray-200">
+          <h2 className="text-lg font-semibold text-gray-900">
+            Top Overdue Clients
+          </h2>
+        </div>
+        <div className="divide-y divide-gray-200">
+          {topOverdueClients.length === 0 ? (
+            <div className="px-6 py-8 text-center text-sm text-gray-500">
+              No overdue clients. Great job!
+            </div>
+          ) : (
+            topOverdueClients.map((client) => {
+              const riskLevel =
+                (client.risk_score ?? 0) >= 70
+                  ? 'High'
+                  : (client.risk_score ?? 0) >= 40
+                    ? 'Medium'
+                    : 'Low'
+              const riskColor =
+                riskLevel === 'High'
+                  ? 'text-red-600 bg-red-50'
+                  : riskLevel === 'Medium'
+                    ? 'text-yellow-700 bg-yellow-50'
+                    : 'text-green-600 bg-green-50'
+
+              return (
+                <div
+                  key={client.name}
+                  className="px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
+                >
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">
+                      {client.name}
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      Outstanding: {formatINR(client.total_outstanding ?? 0)}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <span
+                      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${riskColor}`}
+                    >
+                      {riskLevel} Risk
+                    </span>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Score: {client.risk_score ?? 0}/100
+                    </p>
+                  </div>
+                </div>
+              )
+            })
+          )}
         </div>
       </div>
     </div>
