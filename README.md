@@ -1,6 +1,6 @@
 # PayChase AI
 
-> WhatsApp-first, AI-powered payment collection for Indian freelancers and small agencies.
+> AI-drafted payment follow-ups you approve and send from your own WhatsApp.
 
 [![Next.js](https://img.shields.io/badge/Next.js-14-black)](https://nextjs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-blue)](https://www.typescriptlang.org/)
@@ -9,23 +9,29 @@
 
 ## Problem
 
-Indian businesses lose **15-30 days of cash flow** due to delayed payments. Freelancers and small agencies spend **5-10 hours/week** manually chasing payments via phone calls and WhatsApp. They don't know:
+Chasing payments is awkward. You don't want to damage client relationships, but you also need to get paid. The result: you delay sending follow-ups, messages come across too harsh or too soft, and money stays stuck for 15-30 days longer than it should.
 
-- Which clients will pay late
-- When to follow up
-- How much money to expect next month
+Freelancers and small agencies in India lose **15-30 days of cash flow** due to delayed payments. They spend **5-10 hours/week** thinking about what to say, when to say it, and then actually sending the message. They don't know:
+
+- What tone to strike without ruining the relationship
+- When to escalate from gentle to firm
+- How to be consistent without being annoying
+- Which clients need a nudge vs. which will pay on their own
 
 ## Solution
 
-PayChase AI automates payment reminders through WhatsApp, predicts which clients will pay late using AI, and provides cash flow forecasting — all through a simple dashboard.
+PayChase AI removes the awkwardness of chasing payments. Every day, our AI generates personalized follow-up drafts based on each client's payment history, relationship context, and escalation level. You review each draft in 10 seconds, tweak if needed, and send it from your own WhatsApp number via a deep link.
+
+**Messages are NEVER sent automatically.** You always review and approve. The AI writes, you decide.
 
 ### Key Features
 
-- **AI Risk Scoring** — Predicts payment delays using rule-based scoring (v1) with ML upgrade path (v2)
-- **WhatsApp Reminders** — Automated, multilingual reminders via Meta WhatsApp Cloud API
-- **Smart Timing** — Learns optimal send times from client response patterns
-- **Sentiment-Aware Messages** — Friendly, professional, or firm tone based on client history
-- **UPI Payment Links** — Razorpay integration for instant UPI payments
+- **AI-Drafted Messages** — Relationship-aware follow-ups with escalation levels (gentle/firm/urgent) and your personal style (casual/professional/formal)
+- **You Review, You Send** — Every draft requires your approval. Messages are NEVER auto-sent
+- **WhatsApp Deep Links** — One-click `wa.me` links open WhatsApp with the message pre-filled. You hit send from your own number
+- **Approval Workflow** — Cron generates drafts overnight → you see them in your dashboard → approve with one click → opens WhatsApp ready to send
+- **Response History Awareness** — AI knows if the client replied, promised to pay, or went silent — and adjusts the next draft accordingly
+- **UPI Payment Links** — Razorpay integration for instant UPI payments embedded in messages
 - **Cash Flow Forecast** — Predict incoming revenue with confidence intervals
 - **DPDP Compliant** — Consent tracking, data deletion, and retention policies from day 1
 
@@ -35,9 +41,9 @@ PayChase AI automates payment reminders through WhatsApp, predicts which clients
 |-------|-----------|
 | **Frontend + API** | Next.js 14 (App Router, TypeScript) |
 | **Database** | Supabase (PostgreSQL + Row-Level Security) |
-| **WhatsApp** | Meta WhatsApp Cloud API (direct) |
+| **WhatsApp** | wa.me deep links (user sends from their own number) |
 | **Email** | Resend |
-| **AI** | Rule-based scoring v1 → Random Forest v2 |
+| **AI** | Message generation engine with escalation logic |
 | **Payments** | Razorpay (UPI links + webhooks) |
 | **Hosting** | Vercel |
 | **Rate Limiting** | Upstash Redis |
@@ -50,8 +56,8 @@ PayChase AI automates payment reminders through WhatsApp, predicts which clients
 │                   (ISR cached, 5-min revalidate)                │
 │                                                                 │
 │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐          │
-│  │ 💰 Cash  │ │ 📊 Client│ │ 🤖 AI    │ │ 📱 Whats │ │          │
-│  │  Flow    │ │  Risk    │ │ Insights │ │  App     │ │          │
+│  │ 💰 Cash  │ │ 📊 Client│ │ 🤖 AI    │ │ ✅ Draft │ │          │
+│  │  Flow    │ │  Risk    │ │ Drafts   │ │  Approve │ │          │
 │  └──────────┘ └──────────┘ └──────────┘ └──────────┘          │
 │                                                                 │
 │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐          │
@@ -65,15 +71,23 @@ PayChase AI automates payment reminders through WhatsApp, predicts which clients
        ┌───────────────────────┼───────────────────────────────┐
        │                       │                               │
   ┌────▼─────┐          ┌──────▼──────┐                ┌───────▼───────┐
-  │ Supabase │          │ AI Engine   │                │  Messaging    │
-  │ (Postgres│          │ (Node.js)   │                │  Orchestrator │
+  │ Supabase │          │ AI Draft    │                │  WhatsApp     │
+  │ (Postgres│          │ Engine      │                │  Deep Links   │
   │  + RLS)  │          │             │                │               │
-  │ • Users  │          │ • Rule-based│                │ • WhatsApp    │
-  │ • Clients│          │   scoring   │                │   Cloud API   │
-  │ • Invoice│          │ • Smart     │                │ • Resend      │
-  │ • Payment│          │   timing    │                │ • Razorpay    │
-  │ • Consent│          │ • Sentiment │                │   (UPI)       │
-  └──────────┘          └─────────────┘                └───────────────┘
+  │ • Users  │          │ • Escalation│                │ • wa.me links │
+  │ • Clients│          │   levels    │                │ • User's own  │
+  │ • Invoice│          │ • Style     │                │   number      │
+  │ • Payment│          │   presets   │                │ • Razorpay    │
+  │ • Drafts │          │ • Response  │                │   (UPI)       │
+  └──────────┘          │   history   │                └───────────────┘
+                        └─────────────┘
+
+  FLOW:
+  1. Cron → AI Draft Engine generates message drafts
+  2. Drafts stored in Supabase → appear in dashboard
+  3. User reviews + approves draft
+  4. Approved → wa.me link opens WhatsApp with pre-filled message
+  5. User hits send from their own number
 ```
 
 ## Getting Started
@@ -83,7 +97,6 @@ PayChase AI automates payment reminders through WhatsApp, predicts which clients
 - Node.js 18+
 - npm or pnpm
 - A Supabase project
-- Meta WhatsApp Cloud API credentials
 - Razorpay account
 - Resend account (optional, for email fallback)
 
@@ -111,17 +124,12 @@ PayChase AI automates payment reminders through WhatsApp, predicts which clients
    NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
    SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 
-   # WhatsApp Cloud API
-   WHATSAPP_ACCESS_TOKEN=your-access-token
-   WHATSAPP_PHONE_NUMBER_ID=your-phone-number-id
-   WHATSAPP_WEBHOOK_VERIFY_TOKEN=your-verify-token
-
    # Resend (Email)
    RESEND_API_KEY=your-resend-api-key
 
    # Razorpay (Payments)
    RAZORPAY_KEY_ID=your-razorpay-key-id
-   RAZORPAY_KEY_SECRET=your-razorpay-key-secret
+   RAZORPAY_KEY_SECRET=your-razorpay-secret
    RAZORPAY_WEBHOOK_SECRET=your-razorpay-webhook-secret
 
    # Upstash Redis (Rate Limiting)
@@ -158,15 +166,14 @@ paychase-ai/
 │   │   ├── page.tsx               # Overview page
 │   │   ├── clients/page.tsx       # Client management
 │   │   ├── invoices/page.tsx      # Invoice management
+│   │   ├── drafts/page.tsx        # AI draft approval queue
 │   │   ├── insights/page.tsx      # AI insights
 │   │   └── analytics/page.tsx     # Recovery analytics
 │   ├── api/
 │   │   ├── webhooks/
-│   │   │   ├── whatsapp/route.ts  # WhatsApp webhook handler
 │   │   │   └── razorpay/route.ts  # Razorpay webhook handler
 │   │   └── cron/
-│   │       ├── ai-predictions/route.ts
-│   │       ├── reminder-dispatch/route.ts
+│   │       ├── ai-drafts/route.ts       # Generate message drafts
 │   │       └── payment-reconciliation/route.ts
 │   └── auth/callback/route.ts     # Supabase auth callback
 ├── lib/
@@ -176,14 +183,14 @@ paychase-ai/
 │   │   ├── middleware.ts          # Session middleware
 │   │   └── types.ts               # Database TypeScript types
 │   ├── ai/
-│   │   ├── risk-scoring.ts        # Rule-based risk scoring
-│   │   ├── smart-timing.ts        # Optimal send hour calculation
-│   │   ├── sentiment-templates.ts # Tone-aware message templates
+│   │   ├── draft-generator.ts     # AI message draft generation
+│   │   ├── escalation-logic.ts    # Gentle → firm → urgent escalation
+│   │   ├── style-presets.ts       # Casual / professional / formal
+│   │   ├── response-history.ts    # Client response awareness
 │   │   └── __tests__/             # AI engine tests
 │   ├── whatsapp/
-│   │   ├── client.ts              # WhatsApp Cloud API client
-│   │   ├── templates.ts           # Template message builder
-│   │   └── templates.test.ts      # WhatsApp tests
+│   │   ├── deep-link.ts           # wa.me link generator
+│   │   └── deep-link.test.ts      # Deep link tests
 │   ├── razorpay/                  # Razorpay integration
 │   ├── email/                     # Resend email integration
 │   └── rate-limit.ts              # Upstash Redis rate limiting
@@ -201,7 +208,7 @@ paychase-ai/
 
 ## Database Schema
 
-8 tables with Row-Level Security:
+9 tables with Row-Level Security:
 
 | Table | Purpose |
 |-------|---------|
@@ -209,6 +216,7 @@ paychase-ai/
 | `clients` | Clients who owe money (with risk scores) |
 | `invoices` | Invoice records with payment status |
 | `reminders` | Sent reminders with delivery tracking |
+| `message_drafts` | AI-generated drafts awaiting approval |
 | `payments` | Payment records from Razorpay |
 | `ai_predictions` | AI prediction history |
 | `consent_log` | DPDP consent audit trail |
@@ -218,37 +226,49 @@ See `supabase/migrations/001_initial_schema.sql` for the full schema.
 
 ## AI Engine
 
-### v1: Rule-Based Scoring (Current)
+### Message Draft Generation
 
-Deterministic scoring based on:
-- Client on-time payment rate
-- Average payment delay
-- Days overdue
-- Number of historical invoices
+The AI engine generates follow-up message drafts based on:
+
+- **Escalation level** — Determines tone progression:
+  - `gentle` — First nudge, assumes they forgot
+  - `firm` — Second follow-up, references previous message
+  - `urgent` — Third+ follow-up, clear deadline
+- **User style preset** — How you like to communicate:
+  - `casual` — Friendly, conversational, emoji-friendly
+  - `professional` — Clear, respectful, business-appropriate
+  - `formal` — Structured, reference-heavy, official tone
+- **Response history** — AI knows what happened last time:
+  - Client replied promising payment → draft acknowledges and follows up
+  - Client went silent → draft escalates appropriately
+  - Client disputed amount → draft references resolution
 
 ```typescript
-// Example output
+// Example draft output
 {
-  risk_score: 0.75,           // 0.0 (safe) to 1.0 (high risk)
-  predicted_payment_date: "2026-06-15",
-  confidence_interval: ["2026-06-08", "2026-06-22"]
+  draft_id: "draft_abc123",
+  client_name: "Rahul Sharma",
+  invoice_amount: 25000,
+  escalation_level: "gentle",
+  style: "professional",
+  message: "Hi Rahul, hope you're doing well. Just a quick reminder that invoice #INV-2026-042 (₹25,000) was due on May 15. Please let me know if you need any details from my end. You can pay directly here: razorpay.me/xyz",
+  generated_at: "2026-05-21T06:00:00Z",
+  status: "pending"  // pending | approved | sent | dismissed
 }
 ```
 
-### v2: Random Forest (Planned)
+### v2: LLM-Powered Generation (Planned)
 
-- Activates after 100+ payment records
-- Retrained weekly via cron job
-- Features: historical payment patterns, industry, invoice amount, seasonality
+- Upgrade from template-based to LLM-generated messages
+- Learns from approved drafts to improve future suggestions
+- Contextual awareness of client industry and relationship history
 
 ## Cron Jobs
 
 | Job | Schedule | Purpose |
 |-----|----------|---------|
-| AI Predictions | Daily 6 AM IST | Score all clients, update risk |
-| Reminder Dispatch | Every 2 hours | Send scheduled reminders |
+| AI Draft Generation | Daily 6 AM IST | Generate message drafts for all overdue invoices |
 | Payment Reconciliation | Every 30 min | Catch missed webhooks |
-| Model Retraining | Weekly Sunday 2 AM | Retrain v2 model (future) |
 | Consent Cleanup | Monthly 1st 3 AM | Delete old consent logs |
 
 All cron jobs are paginated (100 records/batch) to avoid Vercel's 60s serverless timeout.
@@ -257,9 +277,9 @@ All cron jobs are paginated (100 records/batch) to avoid Vercel's 60s serverless
 
 | Tier | Price | Invoices | Features |
 |------|-------|----------|----------|
-| **Free** | ₹0/month | 10 | Basic reminders, no AI |
-| **Starter** | ₹999/month | 50 | WhatsApp + Email, AI predictions |
-| **Growth** | ₹2,999/month | 500 | Smart timing, multilingual, UPI links |
+| **Free** | ₹0/month | 10 | Basic drafts, manual review |
+| **Starter** | ₹999/month | 50 | AI drafts, escalation levels, style presets |
+| **Growth** | ₹2,999/month | 500 | Response history, multilingual drafts, UPI links |
 | **Business** | ₹7,999/month | Unlimited | Tally/Zoho sync, team access, custom flows |
 
 ## Development
@@ -281,7 +301,7 @@ npm run test      # Run tests
 npm run test
 
 # Specific test file
-npx jest src/lib/ai/__tests__/risk-scoring.test.ts
+npx jest src/lib/ai/__tests__/draft-generator.test.ts
 ```
 
 ### Code Quality

@@ -1,6 +1,6 @@
 # PayChase AI — Product Requirements Document (PRD)
 
-**Version:** 1.0  
+**Version:** 2.0  
 **Date:** 2026-05-21  
 **Status:** Draft  
 **Author:** opencode (AI-assisted)
@@ -9,20 +9,25 @@
 
 ## 1. Problem Statement
 
-Indian freelancers and small agencies lose 15-30 days of cash flow due to delayed payments. They spend 5-10 hours per week manually chasing payments via phone calls and WhatsApp messages. They lack:
+Chasing payments is awkward. Freelancers and small agencies in India need to collect money but fear damaging client relationships. The tension between "I need to get paid" and "I don't want to be that person" leads to:
 
-- Visibility into **which clients will pay late**
-- Guidance on **when to follow up**
-- Predictability of **how much money to expect next month**
-- A **systematic, automated** way to send reminders without damaging relationships
+- **Delayed follow-ups** — Messages sent too late, extending payment cycles by 15-30 days
+- **Inconsistent tone** — Too soft and clients ignore; too harsh and relationships break
+- **No escalation strategy** — Every message feels like the first one, no progression
+- **Time wasted composing** — 5-10 hours/week thinking about what to say and when
+- **Relationship anxiety** — Fear of being perceived as unprofessional or desperate
+
+The core problem is not just time — it's the emotional friction of asking for money while preserving relationships.
 
 ---
 
 ## 2. Product Vision
 
-**PayChase AI** is a WhatsApp-first, AI-powered payment collection platform that automates payment reminders, predicts late-paying clients, and provides cash flow forecasting — all through a simple web dashboard and WhatsApp integration.
+**PayChase AI** removes the awkwardness of chasing payments. AI drafts the perfect follow-up message, you review it in 10 seconds, and send it from your own WhatsApp number. You're always in control — messages are NEVER sent automatically.
 
-**North Star Metric:** Reduce average payment collection time by 15 days.
+**North Star Metric:** Reduce average payment collection time by 15 days while maintaining client satisfaction scores.
+
+**Key Principle:** The AI writes, you decide. Full transparency, full control, zero surprise sends.
 
 ---
 
@@ -32,13 +37,13 @@ Indian freelancers and small agencies lose 15-30 days of cash flow due to delaye
 - 1-5 people
 - Revenue: ₹5L-₹50L/year
 - Willingness to pay: ₹500-₹2,000/month
-- Pain: Chasing payments takes time away from billable work
+- Pain: Relationship anxiety around payment follow-ups, time wasted composing messages
 
 ### Secondary: Small Agencies
 - 5-20 people (marketing, design, dev shops)
 - Revenue: ₹50L-₹5Cr/year
 - Willingness to pay: ₹2,000-₹5,000/month
-- Pain: Multiple team members chasing multiple clients, no visibility into cash flow
+- Pain: Inconsistent follow-up across team members, no standardized escalation process
 
 ---
 
@@ -48,10 +53,12 @@ Indian freelancers and small agencies lose 15-30 days of cash flow due to delaye
 |--------|--------|-------------|
 | Avg collection time reduction | -15 days | Dashboard analytics |
 | Payment recovery rate improvement | +40% vs manual | A/B comparison |
-| Time saved per user | 5+ hours/week | User survey |
+| Draft approval rate | 70%+ | Percentage of AI drafts users approve without edits |
+| Time spent per follow-up | < 10 seconds | User interaction tracking |
 | 3-month retention | 80%+ | Cohort analysis |
-| WhatsApp delivery rate | 95%+ | Webhook tracking |
+| WhatsApp send rate (via deep link) | 85%+ | Approved drafts that result in wa.me click |
 | UPI payment click-through | 30%+ | Razorpay analytics |
+| Client response rate | 50%+ | Responses tracked via manual logging |
 
 ---
 
@@ -65,7 +72,8 @@ Indian freelancers and small agencies lose 15-30 days of cash flow due to delaye
 | AUTH-2 | Login | P0 | Email/password login with session management |
 | AUTH-3 | Forgot Password | P1 | Password reset via email link |
 | ONB-1 | Company Setup | P1 | Collect company name, phone, industry during first login |
-| ONB-2 | First Client Import | P1 | Guided flow to add first client or upload CSV |
+| ONB-2 | Style Preference Setup | P0 | User selects communication style (casual/professional/formal) during onboarding |
+| ONB-3 | First Client Import | P1 | Guided flow to add first client or upload CSV |
 
 ### 5.2 Client Management
 
@@ -73,11 +81,12 @@ Indian freelancers and small agencies lose 15-30 days of cash flow due to delaye
 |----|---------|----------|-------------|
 | CLI-1 | Add Client | P0 | Manual form: name, phone, email, industry |
 | CLI-2 | Edit Client | P0 | Update client details |
-| CLI-3 | Delete Client | P1 | Cascading delete (invoices, reminders, payments) |
+| CLI-3 | Delete Client | P1 | Cascading delete (invoices, reminders, drafts, payments) |
 | CLI-4 | Client List | P0 | Sortable, filterable table with risk score badges |
-| CLI-5 | Client Risk Cards | P0 | Visual cards showing risk score, outstanding, avg delay, on-time rate, best contact time |
+| CLI-5 | Client Risk Cards | P0 | Visual cards showing risk score, outstanding, avg delay, on-time rate, last response |
 | CLI-6 | CSV Import | P1 | Upload CSV with pre-flight validation, partial import, error report |
 | CLI-7 | Consent Tracking | P0 | DPDP-compliant consent checkbox on client creation, logged in consent_log table |
+| CLI-8 | Response History | P0 | Track client responses (replied/promised/silent/disputed) per follow-up |
 
 ### 5.3 Invoice Management
 
@@ -86,38 +95,41 @@ Indian freelancers and small agencies lose 15-30 days of cash flow due to delaye
 | INV-1 | Create Invoice | P0 | Manual form: client, number, amount, issue date, due date |
 | INV-2 | Edit Invoice | P0 | Update invoice details |
 | INV-3 | Invoice List | P0 | Filterable by status (pending, paid, overdue), sortable |
-| INV-4 | Bulk Actions | P1 | Select multiple invoices, send reminders, mark paid |
+| INV-4 | Bulk Actions | P1 | Select multiple invoices, generate drafts, mark paid |
 | INV-5 | Invoice Status Tracking | P0 | Auto-update on payment webhook |
 | INV-6 | UPI Link Generation | P0 | Auto-generate Razorpay payment link on invoice creation |
 
-### 5.4 AI Engine
+### 5.4 AI Engine — Message Generation
 
 | ID | Feature | Priority | Description |
 |----|---------|----------|-------------|
-| AI-1 | Risk Scoring (v1) | P0 | Rule-based scoring: on_time_rate, avg_delay, overdue days, new client uncertainty |
-| AI-2 | Payment Date Prediction | P0 | Predict when client will pay based on historical avg delay |
-| AI-3 | Confidence Intervals | P1 | ±7 day confidence window around predicted date |
-| AI-4 | Smart Timing | P1 | Calculate optimal send hour from WhatsApp read/responded timestamps |
-| AI-5 | Sentiment Templates | P0 | Friendly/professional/firm tone based on client on_time_rate |
-| AI-6 | ML Upgrade Path (v2) | P2 | Random Forest model after 100+ payment records, retrained weekly |
+| AI-1 | Draft Generation | P0 | Generate personalized follow-up message for each overdue invoice |
+| AI-2 | Escalation Levels | P0 | Three tiers: gentle (1st), firm (2nd), urgent (3rd+) — auto-determined by follow-up count and days overdue |
+| AI-3 | Style Presets | P0 | User-selected tone: casual, professional, formal — applied to all drafts |
+| AI-4 | Response History Awareness | P0 | AI adjusts draft based on client's last response (replied, promised, silent, disputed) |
+| AI-5 | Payment Date Prediction | P1 | Predict when client will pay based on historical avg delay |
+| AI-6 | Confidence Intervals | P1 | ±7 day confidence window around predicted date |
+| AI-7 | Smart Timing Suggestion | P1 | Suggest optimal time to review/approve drafts based on client response patterns |
+| AI-8 | LLM Upgrade Path (v2) | P2 | Upgrade from template-based to LLM-generated messages with learning from approved drafts |
 
 ### 5.5 Messaging & Reminders
 
 | ID | Feature | Priority | Description |
 |----|---------|----------|-------------|
-| MSG-1 | WhatsApp Reminders | P0 | Send via Meta WhatsApp Cloud API using approved utility templates |
+| MSG-1 | WhatsApp Deep Links | P0 | Generate wa.me URLs with pre-filled message text. User opens WhatsApp and sends from their own number |
 | MSG-2 | Email Reminders | P1 | Fallback via Resend when WhatsApp unavailable |
-| MSG-3 | Multilingual Support | P1 | Templates in English, Hindi, Tamil, Telugu, Bengali |
-| MSG-4 | Reminder Scheduling | P0 | Cron-based dispatch every 2 hours, respects optimal send hour |
-| MSG-5 | Channel Selection | P1 | Auto-select WhatsApp or email based on client preference and availability |
-| MSG-6 | Delivery Tracking | P0 | Track delivered_at, read_at, responded_at via WhatsApp webhooks |
-| MSG-7 | Fallback Logic | P1 | Invalid WhatsApp number → email fallback |
+| MSG-3 | Multilingual Support | P1 | Drafts in English, Hindi, Tamil, Telugu, Bengali |
+| MSG-4 | Draft Generation Cron | P0 | Daily cron at 6 AM IST generates drafts for all overdue invoices |
+| MSG-5 | NO Auto-Send | P0 | Messages are NEVER sent automatically. User must explicitly approve and send |
+| MSG-6 | Delivery Tracking | P1 | Manual status logging: sent, delivered, replied (user marks after sending) |
+| MSG-7 | Fallback Logic | P1 | No WhatsApp number → email draft fallback |
+| MSG-8 | Message Approval Workflow | P0 | Core workflow: cron generates drafts → user sees in dashboard → reviews/edits → approves → wa.me link opens → user sends |
 
 ### 5.6 Payments
 
 | ID | Feature | Priority | Description |
 |----|---------|----------|-------------|
-| PAY-1 | Razorpay Integration | P0 | Create payment links, embed in reminders |
+| PAY-1 | Razorpay Integration | P0 | Create payment links, embed in message drafts |
 | PAY-2 | Webhook Handler | P0 | Idempotent payment capture via UNIQUE constraint on razorpay_payment_id |
 | PAY-3 | Payment Recording | P0 | Auto-record payment, mark invoice paid, update AI model |
 | PAY-4 | Payment Reconciliation | P1 | Cron job every 30 min to catch missed webhooks |
@@ -128,20 +140,21 @@ Indian freelancers and small agencies lose 15-30 days of cash flow due to delaye
 | ID | Feature | Priority | Description |
 |----|---------|----------|-------------|
 | DASH-1 | Overview Page | P0 | Total outstanding, cash flow forecast, recovery rate, avg collection time |
-| DASH-2 | Client Risk Page | P0 | Risk cards with sort/filter by risk score |
-| DASH-3 | Invoice Manager | P0 | Full CRUD with filters, bulk actions, CSV upload |
-| DASH-4 | AI Insights Page | P0 | Late payment predictions, optimal collection day, at-risk amounts |
-| DASH-5 | Recovery Analytics | P1 | DSO trends, recovery rates, channel effectiveness |
-| DASH-6 | ISR Caching | P1 | 5-min revalidate, tag-based invalidation on data changes |
+| DASH-2 | Draft Approval Queue | P0 | Primary inbox showing pending AI drafts with preview, edit, approve, dismiss actions |
+| DASH-3 | Client Risk Page | P0 | Risk cards with sort/filter by risk score |
+| DASH-4 | Invoice Manager | P0 | Full CRUD with filters, bulk actions, CSV upload |
+| DASH-5 | AI Insights Page | P0 | Late payment predictions, optimal collection day, at-risk amounts |
+| DASH-6 | Recovery Analytics | P1 | DSO trends, recovery rates, approval rate trends |
+| DASH-7 | ISR Caching | P1 | 5-min revalidate, tag-based invalidation on data changes |
 
 ### 5.8 Compliance & Security
 
 | ID | Feature | Priority | Description |
 |----|---------|----------|-------------|
-| SEC-1 | Row-Level Security | P0 | All 8 tables scoped to user_id via Supabase RLS |
+| SEC-1 | Row-Level Security | P0 | All 9 tables scoped to user_id via Supabase RLS |
 | SEC-2 | DPDP Consent Log | P0 | Audit trail of all consent events |
 | SEC-3 | Data Deletion | P1 | One-click cascading delete for client data |
-| SEC-4 | Data Export | P1 | Export client/invoice data as JSON/CSV |
+| SEC-4 | Data Export | P1 | Export client/invoice/draft data as JSON/CSV |
 | SEC-5 | Rate Limiting | P1 | 100 req/min per user via Upstash Redis |
 | SEC-6 | Data Retention | P2 | Delete consent logs after 3 years |
 
@@ -153,14 +166,16 @@ Indian freelancers and small agencies lose 15-30 days of cash flow due to delaye
 |----------|-------------|--------|
 | **Performance** | Dashboard page load | < 2s (ISR cached) |
 | **Performance** | API response time | < 500ms (p95) |
+| **Performance** | Draft generation | < 2s per draft |
 | **Performance** | Cron job execution | < 60s (paginated, 100/batch) |
 | **Scalability** | Max users (free tier) | 10K users |
 | **Scalability** | Max invoices/user | 500 (free), 5000 (paid) |
-| **Reliability** | WhatsApp delivery | 95%+ (with email fallback) |
+| **Reliability** | Draft generation success | 99%+ |
 | **Reliability** | Webhook idempotency | 100% (UNIQUE constraint) |
 | **Availability** | Uptime target | 99.5% (Vercel free tier) |
 | **Security** | Auth | Supabase Auth (JWT) |
 | **Security** | Data isolation | RLS on all tables |
+| **Security** | No auto-send guarantee | Zero messages sent without explicit user approval |
 | **Compliance** | DPDP Act 2023 | Consent tracking, data minimization, deletion rights |
 
 ---
@@ -173,9 +188,9 @@ Indian freelancers and small agencies lose 15-30 days of cash flow due to delaye
 |-------|-----------|-----------|
 | Frontend + API | Next.js 14 (App Router, TypeScript) | Single codebase, serverless, Vercel hosting |
 | Database | Supabase (PostgreSQL + RLS) | Free tier generous, auth included, row-level security |
-| WhatsApp | Meta WhatsApp Cloud API (direct) | First 1,000 service conversations free, no BSP markup |
+| WhatsApp | wa.me deep links | Zero API cost, user sends from own number, preserves relationships |
 | Email | Resend | 3,000 emails/month free |
-| AI | Rule-based v1 → Random Forest v2 | Free, debuggable, sufficient for v1 |
+| AI | Template-based v1 → LLM v2 | Deterministic, debuggable, sufficient for v1 |
 | Payments | Razorpay | UPI links, webhooks, 2% per transaction |
 | Hosting | Vercel | Free tier: 100GB bandwidth, serverless, cron |
 | Rate Limiting | Upstash Redis | 10K requests/day free |
@@ -184,22 +199,51 @@ Indian freelancers and small agencies lose 15-30 days of cash flow due to delaye
 
 | Job | Schedule | Pagination | Purpose |
 |-----|----------|------------|---------|
-| AI Predictions | Daily 6 AM IST | 100 clients/batch | Score all clients, update risk |
-| Reminder Dispatch | Every 2 hours | 50 reminders/batch | Send scheduled reminders |
+| AI Draft Generation | Daily 6 AM IST | 100 invoices/batch | Generate message drafts for overdue invoices |
 | Payment Reconciliation | Every 30 min | N/A | Catch missed webhooks |
-| Model Retraining | Weekly Sunday 2 AM | N/A | Retrain v2 model (future) |
 | Consent Cleanup | Monthly 1st 3 AM | 100 records/batch | Delete old consent logs |
 
 ### 7.3 Data Flow
 
 ```
 User signs up → Supabase Auth → RLS isolates data
+User sets style preference → casual/professional/formal stored
 User uploads invoices → CSV validated → Clients created/updated
-Vercel Cron (6 AM) → AI scores clients → Updates risk scores
-Reminder Scheduler (2hr) → Selects channel → Renders template → Sends
-WhatsApp Webhook → Tracks delivery/read/reply → Updates timing data
+Vercel Cron (6 AM) → AI generates drafts → Stores in message_drafts table
+Dashboard shows pending drafts → User reviews, edits if needed, approves
+Approved draft → wa.me link generated → Opens WhatsApp with pre-filled message
+User hits send in WhatsApp → Message sent from user's own number
+User marks as sent in dashboard → Status updated, response tracking begins
 Client pays via UPI → Razorpay webhook (idempotent) → Invoice marked paid
 Dashboard refreshes (ISR 5-min) → Shows updated metrics
+```
+
+### 7.4 Approval Workflow Detail
+
+```
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│   CRON      │────▶│   AI DRAFT  │────▶│  DASHBOARD  │────▶│   APPROVE   │
+│  6 AM IST   │     │  GENERATOR  │     │   INBOX     │     │   / EDIT    │
+└─────────────┘     └─────────────┘     └─────────────┘     └──────┬──────┘
+                                                                   │
+                                                      ┌────────────┼────────────┐
+                                                      ▼            ▼            ▼
+                                                ┌──────────┐ ┌──────────┐ ┌──────────┐
+                                                │ APPROVE  │ │  EDIT    │ │ DISMISS  │
+                                                └────┬─────┘ └────┬─────┘ └────┬─────┘
+                                                     │            │            │
+                                                     ▼            │            │
+                                                ┌──────────┐     │            │
+                                                │ wa.me    │     │            │
+                                                │ link     │     │            │
+                                                └────┬─────┘     │            │
+                                                     │           │            │
+                                                     ▼           ▼            ▼
+                                                ┌─────────────────────────────────┐
+                                                │      WHATSAPP (USER'S PHONE)    │
+                                                │   Pre-filled message, user      │
+                                                │   reviews and hits SEND         │
+                                                └─────────────────────────────────┘
 ```
 
 ---
@@ -208,9 +252,9 @@ Dashboard refreshes (ISR 5-min) → Shows updated metrics
 
 | Tier | Price | Invoices | Features |
 |------|-------|----------|----------|
-| **Free** | ₹0/month | 10 | Basic reminders, no AI |
-| **Starter** | ₹999/month | 50 | WhatsApp + Email, AI predictions |
-| **Growth** | ₹2,999/month | 500 | Smart timing, multilingual, UPI links |
+| **Free** | ₹0/month | 10 | Basic drafts, manual review |
+| **Starter** | ₹999/month | 50 | AI drafts, escalation levels, style presets |
+| **Growth** | ₹2,999/month | 500 | Response history, multilingual drafts, UPI links |
 | **Business** | ₹7,999/month | Unlimited | Tally/Zoho sync, team access, custom flows |
 
 ---
@@ -224,8 +268,8 @@ Dashboard refreshes (ISR 5-min) → Shows updated metrics
 | **Geography** | India-first (UPI, INR, Indian languages) |
 | **Free Tier Dependency** | All services must run on free tiers until paying users |
 | **Vercel Timeout** | Serverless functions limited to 60s → paginate cron jobs |
-| **WhatsApp Template Approval** | Utility templates require Meta approval before use |
 | **DPDP Compliance** | Mandatory from day 1 (consent, deletion, retention) |
+| **No WhatsApp Cloud API for sending** | Cost savings + relationship preservation via deep links |
 
 ---
 
@@ -238,6 +282,8 @@ Dashboard refreshes (ISR 5-min) → Shows updated metrics
 - Credit scoring database (planned for v3)
 - Mobile app (planned for v4)
 - API for third-party platforms (planned for v3)
+- LLM-powered message generation (planned for v2)
+- Auto-send capability (explicitly out of scope — core product principle)
 
 ---
 
@@ -245,14 +291,15 @@ Dashboard refreshes (ISR 5-min) → Shows updated metrics
 
 | Risk | Probability | Impact | Mitigation |
 |------|-------------|--------|------------|
-| WhatsApp rate limits | Medium | Low | Batch messages, respect 24-hour window |
+| User doesn't approve drafts | Medium | High | Make editing easy in dashboard, learn from edits to improve drafts |
+| Draft quality too low | Medium | High | Start with proven templates, iterate based on approval rate data |
 | Razorpay webhook failures | Low | Medium | Polling fallback, UNIQUE constraint |
-| AI inaccurate early | High | Low | Rule-based is deterministic, not probabilistic |
 | DPDP non-compliance | Low | High | Consent tracking, data minimization, legal review |
-| Competitor launches | Medium | Medium | First-mover advantage, UX focus |
-| User churn | Medium | High | Show ROI immediately in dashboard |
-| Vercel timeout on cron | Medium | Medium | Paginate at 100 clients/batch |
-| Template rejection by Meta | Medium | Low | Fallback templates, re-apply with changes |
+| Competitor launches | Medium | Medium | First-mower advantage, UX focus on approval workflow |
+| User churn | Medium | High | Show ROI immediately in dashboard, track approval rate trends |
+| Vercel timeout on cron | Medium | Medium | Paginate at 100 invoices/batch |
+| User forgets to check drafts | Medium | Medium | Email notification when new drafts are ready |
+| wa.me link fails on mobile | Low | Low | Fallback to copy-to-clipboard with WhatsApp open intent |
 
 ---
 
@@ -260,14 +307,14 @@ Dashboard refreshes (ISR 5-min) → Shows updated metrics
 
 ### Phase 1 (Month 1-2): Direct Outreach
 - LinkedIn DMs to agency owners
-- Twitter/X threads about payment recovery
+- Twitter/X threads about payment recovery without relationship damage
 - Reddit posts in r/India, r/developersIndia, r/freelance
 - WhatsApp business groups
 
 ### Phase 2 (Month 2-4): Content Marketing
 - YouTube: "How to recover stuck payments without ruining relationships"
-- Blog: "AI payment prediction for Indian businesses"
-- Case studies: "How Agency X recovered ₹4.2L in 30 days"
+- Blog: "AI-drafted payment follow-ups that preserve client trust"
+- Case studies: "How Agency X recovered ₹4.2L in 30 days without a single awkward conversation"
 
 ### Phase 3 (Month 4-6): CA Partnerships
 - Partner with CA firms (100-500 clients each)
@@ -286,19 +333,20 @@ Dashboard refreshes (ISR 5-min) → Shows updated metrics
 |------|--------|-------|
 | Project Setup | ✅ Done | Next.js 14 + TypeScript + Tailwind |
 | Dependencies | ✅ Done | Supabase, Razorpay, Resend, Upstash, lucide-react, zod |
-| Database Schema | ✅ Done | 8 tables, 12 indexes, RLS, triggers |
+| Database Schema | ✅ Done | 9 tables (added message_drafts), 12 indexes, RLS, triggers |
 | Environment Config | ✅ Done | .env.example + .env.local |
 | Supabase Client | ✅ Done | Browser, server, middleware, types |
 | Auth Pages | ✅ Done | Login, signup, forgot/reset password, callback |
 | Dashboard Layout | ✅ Done | Sidebar, overview page, loading state |
-| AI Engine | ✅ Done | Risk scoring, smart timing, sentiment templates (34 tests) |
-| WhatsApp API | ✅ Done | Client, template builder, tests (5 tests) |
+| AI Engine | ⏳ Pending | Pivot from risk scoring to draft generation |
+| WhatsApp Deep Links | ⏳ Pending | wa.me link generator |
+| Draft Approval Queue | ⏳ Pending | Core UI component |
 | Razorpay Integration | ⏳ Pending | |
-| Webhook Handlers | ⏳ Pending | WhatsApp + Razorpay |
+| Webhook Handlers | ⏳ Pending | Razorpay only (no WhatsApp webhook needed) |
 | Client CRUD | ⏳ Pending | |
 | Invoice CRUD | ⏳ Pending | |
 | CSV Import | ⏳ Pending | |
-| Cron Jobs | ⏳ Pending | |
+| Cron Jobs | ⏳ Pending | Draft generation replaces reminder dispatch |
 | Rate Limiting | ⏳ Pending | |
 | ISR Caching | ⏳ Pending | |
 | Tests (Integration/E2E) | ⏳ Pending | |
@@ -307,28 +355,29 @@ Dashboard refreshes (ISR 5-min) → Shows updated metrics
 
 ## 14. Open Questions
 
-1. **WhatsApp Template Approval:** What is the current approval timeline for utility templates in India?
-2. **Razorpay Onboarding:** What documents are required for a new Indian business to get Razorpay API keys?
-3. **Supabase Auth Email:** Should we use Supabase's default email templates or custom ones via Resend?
+1. **Draft Editing UX:** Should users be able to edit drafts inline in the dashboard, or is approve/dismiss enough for MVP?
+2. **Email Notification for Drafts:** Should we notify users via email when new drafts are ready, or rely on dashboard visits?
+3. **Response Tracking:** How do we track whether a client responded after the user sends a message? Manual logging vs. WhatsApp Business API read receipts?
 4. **Data Retention Policy:** Is 3 years the correct retention period for consent logs under DPDP?
 5. **Multi-language Templates:** Which 5 Indian languages should be prioritized for v1?
+6. **Style Preset Defaults:** Should we recommend a default style (professional) during onboarding, or force user to choose?
 
 ---
 
 ## 15. Appendices
 
 ### A. Database Schema Summary
-- 8 tables: users, clients, invoices, reminders, payments, ai_predictions, consent_log, audit_log
+- 9 tables: users, clients, invoices, reminders, message_drafts, payments, ai_predictions, consent_log, audit_log
 - 12 indexes for query performance
-- 8 RLS policies for data isolation
+- 9 RLS policies for data isolation
 - 1 trigger for payment amount validation
 
-### B. Environment Variables (12 total)
+### B. Environment Variables (10 total)
 - Supabase: 3 vars
-- WhatsApp: 3 vars
 - Razorpay: 3 vars
 - Resend: 1 var
 - Upstash: 2 vars
+- Note: WhatsApp Cloud API credentials removed (no longer needed for sending)
 
 ### C. Key Dependencies
 - @supabase/supabase-js, @supabase/ssr
