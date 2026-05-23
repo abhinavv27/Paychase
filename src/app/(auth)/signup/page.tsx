@@ -61,6 +61,51 @@ export default async function SignupPage({
             placeholder="••••••••"
           />
         </div>
+
+        <fieldset>
+          <legend className="block text-sm font-medium text-gray-700 mb-2">
+            Communication Style
+          </legend>
+          <div className="space-y-2">
+            <label className="flex items-center gap-3 rounded-md border border-gray-300 px-3 py-2 cursor-pointer hover:bg-gray-50 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50">
+              <input
+                type="radio"
+                name="style"
+                value="casual"
+                className="text-blue-600 focus:ring-blue-500"
+              />
+              <div>
+                <span className="text-sm font-medium text-gray-900">Casual</span>
+                <span className="block text-xs text-gray-500">Friendly and relaxed</span>
+              </div>
+            </label>
+            <label className="flex items-center gap-3 rounded-md border border-gray-300 px-3 py-2 cursor-pointer hover:bg-gray-50 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50">
+              <input
+                type="radio"
+                name="style"
+                value="professional"
+                defaultChecked
+                className="text-blue-600 focus:ring-blue-500"
+              />
+              <div>
+                <span className="text-sm font-medium text-gray-900">Professional</span>
+                <span className="block text-xs text-gray-500">Polished and business-like</span>
+              </div>
+            </label>
+            <label className="flex items-center gap-3 rounded-md border border-gray-300 px-3 py-2 cursor-pointer hover:bg-gray-50 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50">
+              <input
+                type="radio"
+                name="style"
+                value="formal"
+                className="text-blue-600 focus:ring-blue-500"
+              />
+              <div>
+                <span className="text-sm font-medium text-gray-900">Formal</span>
+                <span className="block text-xs text-gray-500">Strict and official</span>
+              </div>
+            </label>
+          </div>
+        </fieldset>
       </div>
 
       <button

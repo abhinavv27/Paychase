@@ -9,7 +9,7 @@ type InvoiceInsert = Database['public']['Tables']['invoices']['Insert']
 type InvoiceUpdate = Database['public']['Tables']['invoices']['Update']
 
 export async function createInvoiceAction(
-  _prevState: any,
+  _prevState: Record<string, unknown>,
   formData: FormData
 ): Promise<{ success: boolean; error?: string }> {
   const supabase = createClient()
@@ -30,18 +30,29 @@ export async function createInvoiceAction(
     status: 'pending',
   }
 
-  if (!invoiceData.client_id || !invoiceData.invoice_number || !invoiceData.amount) {
+  if (isNaN(invoiceData.amount)) {
+    return { success: false, error: 'Invalid amount' }
+  }
+
+  if (!invoiceData.client_id || !invoiceData.invoice_number) {
     return { success: false, error: 'Missing required fields' }
   }
 
-  const { data, error } = await supabase
-    .from('invoices')
-    .insert(invoiceData)
-    .select()
-    .single()
+  try {
+    const { error } = await supabase
+      .from('invoices')
+      .insert(invoiceData)
+      .select()
+      .single()
 
-  if (error) {
-    return { success: false, error: error.message }
+    if (error) {
+      if (error.code === '23505') {
+        return { success: false, error: 'An invoice with this number already exists.' }
+      }
+      return { success: false, error: error.message }
+    }
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : 'Failed to save invoice' }
   }
 
   revalidatePath('/invoices')
@@ -50,7 +61,7 @@ export async function createInvoiceAction(
 
 export async function updateInvoiceAction(
   id: string,
-  _prevState: any,
+  _prevState: Record<string, unknown>,
   formData: FormData
 ): Promise<{ success: boolean; error?: string }> {
   const supabase = createClient()
@@ -69,14 +80,22 @@ export async function updateInvoiceAction(
     due_date: formData.get('due_date') as string,
   }
 
-  const { error } = await supabase
-    .from('invoices')
-    .update(invoiceData)
-    .eq('id', id)
-    .eq('user_id', user.id)
+  if (invoiceData.amount !== undefined && isNaN(invoiceData.amount)) {
+    return { success: false, error: 'Invalid amount' }
+  }
 
-  if (error) {
-    return { success: false, error: error.message }
+  try {
+    const { error } = await supabase
+      .from('invoices')
+      .update(invoiceData)
+      .eq('id', id)
+      .eq('user_id', user.id)
+
+    if (error) {
+      return { success: false, error: error.message }
+    }
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : 'Failed to update invoice' }
   }
 
   revalidatePath('/invoices')
