@@ -1,29 +1,10 @@
+import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { linkExistingUserPhone } from '@/lib/whatsapp/user-linking'
-import { revalidatePath } from 'next/cache'
+import { PhoneLinkForm } from './phone-link-form'
 
-async function handleLinkPhone(formData: FormData) {
-  'use server'
-
-  const supabase = createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) {
-    redirect('/login')
-  }
-
-  const phone = formData.get('phone') as string
-
-  if (!phone) {
-    return
-  }
-
-  const result = await linkExistingUserPhone(user.id, phone)
-
-  if (result.success) {
-    revalidatePath('/settings')
-  }
+export const metadata: Metadata = {
+  title: 'Settings',
 }
 
 export default async function SettingsPage() {
@@ -31,6 +12,7 @@ export default async function SettingsPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
+  // Profile fetch depends on user.id from getUser() above — cannot parallelize
   const { data: profile } = await supabase
     .from('users')
     .select('*')
@@ -53,20 +35,7 @@ export default async function SettingsPage() {
             <span>Linked: +{profile.phone}</span>
           </div>
         ) : (
-          <form action={handleLinkPhone} className="flex gap-2">
-            <input
-              type="tel"
-              name="phone"
-              placeholder="+91 98765 43210"
-              className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-            <button
-              type="submit"
-              className="rounded-lg bg-blue-600 px-4 py-2 text-white font-medium text-sm hover:bg-blue-700 transition-colors"
-            >
-              Link
-            </button>
-          </form>
+          <PhoneLinkForm />
         )}
       </div>
 

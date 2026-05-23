@@ -1,5 +1,10 @@
+import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
 import { ActionBanner } from '@/components/dashboard/action-banner'
+
+export const metadata: Metadata = {
+  title: 'Dashboard',
+}
 
 function formatINR(amount: number): string {
   return new Intl.NumberFormat('en-IN', {
