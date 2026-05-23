@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { StatusBadge } from '@/components/invoices/status-badge'
 import { DeleteInvoiceButton } from '@/components/invoices/delete-button'
 import Link from 'next/link'
+import { FileText, Plus } from 'lucide-react'
 import type { Database } from '@/lib/supabase/types'
 
 export const metadata: Metadata = {
@@ -181,8 +182,19 @@ export default async function InvoicesPage({
             <tbody className="divide-y divide-gray-200">
               {typedInvoices.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
-                    No invoices found.
+                  <td colSpan={7}>
+                    <div className="flex flex-col items-center justify-center py-12 text-center">
+                      <FileText className="w-12 h-12 text-gray-300 mb-4" />
+                      <h3 className="text-sm font-medium text-gray-900">No invoices yet</h3>
+                      <p className="text-sm text-gray-500 mt-1">Get started by creating your first invoice.</p>
+                      <Link
+                        href="/invoices/create"
+                        className="mt-4 inline-flex items-center gap-1 px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700"
+                      >
+                        <Plus className="w-4 h-4" />
+                        Create Invoice
+                      </Link>
+                    </div>
                   </td>
                 </tr>
               ) : (
