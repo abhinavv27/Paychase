@@ -6,6 +6,48 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[]
 
+export type DbResult<T = unknown> = { data: T | null; error: { code?: string; message?: string } | null }
+export type DbSingleResult = DbResult
+export type DbVoidResult = { error: { code?: string; message?: string } | null }
+
+export interface DbSelectEqChain {
+  single(): Promise<DbSingleResult>
+  order(col: string, opts: unknown): Promise<DbSingleResult>
+  eq(col: string, val: unknown): DbSelectEqChain
+  neq(col: string, val: unknown): DbSelectEqChain
+  ilike(col: string, val: string): DbSelectEqChain
+}
+
+export interface DbSelectChain {
+  eq(col: string, val: unknown): DbSelectEqChain
+  ilike(col: string, val: string): { single(): Promise<DbSingleResult> }
+  order(col: string, opts: unknown): Promise<DbSingleResult>
+  lt(col: string, val: unknown): Promise<DbSingleResult>
+}
+
+export interface DbUpdateEqChain extends Promise<DbVoidResult> {
+  eq(col: string, val: unknown): DbUpdateEqChain
+  neq(col: string, val: unknown): DbUpdateEqChain
+}
+
+export interface DbUpdateChain {
+  eq(col: string, val: unknown): DbUpdateEqChain
+}
+
+export interface DbInsertResult extends Promise<DbVoidResult> {
+  select(cols: string): { single(): Promise<DbSingleResult> }
+}
+
+export interface DbTable {
+  select(cols: string): DbSelectChain
+  insert(data: Record<string, unknown> | Record<string, unknown>[]): DbInsertResult
+  update(data: Record<string, unknown>): DbUpdateChain
+}
+
+export interface DbClient {
+  from(table: string): DbTable
+}
+
 export interface Database {
   public: {
     Tables: {
@@ -17,6 +59,7 @@ export interface Database {
           phone: string | null
           company_name: string | null
           plan: string
+          style_preference: 'casual' | 'professional' | 'formal'
           created_at: string
           updated_at: string
         }
@@ -27,6 +70,7 @@ export interface Database {
           phone?: string | null
           company_name?: string | null
           plan?: string
+          style_preference?: 'casual' | 'professional' | 'formal'
           created_at?: string
           updated_at?: string
         }
@@ -37,6 +81,7 @@ export interface Database {
           phone?: string | null
           company_name?: string | null
           plan?: string
+          style_preference?: 'casual' | 'professional' | 'formal'
           created_at?: string
           updated_at?: string
         }
