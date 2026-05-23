@@ -2,6 +2,8 @@ import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
 import { StatusBadge } from '@/components/invoices/status-badge'
 import { DeleteInvoiceButton } from '@/components/invoices/delete-button'
+import { ProbabilityBadge } from '@/components/invoices/probability-badge'
+import { calculatePaymentProbability } from '@/lib/ai/payment-probability'
 import Link from 'next/link'
 import { FileText, Plus } from 'lucide-react'
 import type { Database } from '@/lib/supabase/types'
@@ -11,7 +13,7 @@ export const metadata: Metadata = {
 }
 
 type InvoiceWithClient = Database['public']['Tables']['invoices']['Row'] & {
-  client: { name: string } | null
+  client: { name: string; on_time_rate: number; avg_payment_delay_days: number } | null
 }
 
 const PAGE_SIZE = 20
@@ -46,7 +48,7 @@ export default async function InvoicesPage({
   // Data query with pagination and optional filter
   let query = supabase
     .from('invoices')
-    .select('*, client:clients(name)')
+    .select('*, client:clients(name, on_time_rate, avg_payment_delay_days)')
     .eq('user_id', user.id)
 
   if (statusFilter === 'overdue') {
@@ -174,6 +176,9 @@ export default async function InvoicesPage({
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Status
                 </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Payment Prob.
+                </th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Actions
                 </th>
@@ -182,7 +187,7 @@ export default async function InvoicesPage({
             <tbody className="divide-y divide-gray-200">
               {typedInvoices.length === 0 ? (
                 <tr>
-                  <td colSpan={7}>
+                  <td colSpan={8}>
                     <div className="flex flex-col items-center justify-center py-12 text-center">
                       <FileText className="w-12 h-12 text-gray-300 mb-4" />
                       <h3 className="text-sm font-medium text-gray-900">No invoices yet</h3>
@@ -200,6 +205,16 @@ export default async function InvoicesPage({
               ) : (
                 typedInvoices.map((invoice) => {
                   const isOverdue = invoice.status === 'pending' && new Date(invoice.due_date) < new Date(today)
+                  const daysOverdue = isOverdue
+                    ? Math.floor((Date.now() - new Date(invoice.due_date).getTime()) / (1000 * 60 * 60 * 24))
+                    : 0
+                  const prob = invoice.client
+                    ? calculatePaymentProbability({
+                        daysOverdue,
+                        clientOnTimeRate: invoice.client.on_time_rate ?? 0,
+                        clientAvgDelayDays: invoice.client.avg_payment_delay_days ?? 0,
+                      })
+                    : null
                   return (
                     <tr key={invoice.id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
@@ -219,6 +234,17 @@ export default async function InvoicesPage({
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <StatusBadge status={isOverdue ? 'overdue' : invoice.status} />
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {prob ? (
+                          <div className="flex gap-1">
+                            <ProbabilityBadge probability={prob.probability7} label="7d" />
+                            <ProbabilityBadge probability={prob.probability30} label="30d" />
+                            <ProbabilityBadge probability={prob.probability60} label="60d" />
+                          </div>
+                        ) : (
+                          <span className="text-xs text-gray-400">N/A</span>
+                        )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
                         <Link

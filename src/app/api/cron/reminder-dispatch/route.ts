@@ -40,6 +40,14 @@ export async function GET(request: NextRequest) {
         client: Record<string, unknown> | null
       }>
 
+      const draftsToInsert: Array<{
+        userId: string
+        invoiceId: string
+        clientId: string
+        messageText: string
+        daysOverdue: number
+      }> = []
+
       for (const invoice of typedInvoices) {
         try {
           const userId = invoice.user_id
@@ -98,27 +106,40 @@ export async function GET(request: NextRequest) {
 
           const aiMessage = generateFollowUpMessage(messageContext)
 
-          const { error: insertError } = await asDb(supabase).from('reminders').insert({
-            user_id: userId,
-            invoice_id: invoice.id,
-            client_id: invoice.client_id,
-            channel: 'whatsapp',
-            template_type: 'payment_followup',
-            message_text: aiMessage.text,
-            language: 'en',
-            status: 'draft',
-            approval_status: 'draft',
-          } as Record<string, unknown>)
-
-          if (insertError) {
-            console.error('Failed to insert draft:', insertError)
-            continue
-          }
-
-          totalDrafts++
+          draftsToInsert.push({
+            userId,
+            invoiceId: invoice.id,
+            clientId: invoice.client_id,
+            messageText: aiMessage.text,
+            daysOverdue,
+          })
         } catch (loopError) {
           console.error('Failed to process draft for invoice:', invoice.id, loopError)
         }
+      }
+
+      // Sort by urgency (most overdue first = earlier in the day ordering)
+      draftsToInsert.sort((a, b) => b.daysOverdue - a.daysOverdue)
+
+      for (const draft of draftsToInsert) {
+        const { error: insertError } = await asDb(supabase).from('reminders').insert({
+          user_id: draft.userId,
+          invoice_id: draft.invoiceId,
+          client_id: draft.clientId,
+          channel: 'whatsapp',
+          template_type: 'payment_followup',
+          message_text: draft.messageText,
+          language: 'en',
+          status: 'draft',
+          approval_status: 'draft',
+        } as Record<string, unknown>)
+
+        if (insertError) {
+          console.error('Failed to insert draft:', insertError)
+          continue
+        }
+
+        totalDrafts++
       }
 
       offset += BATCH_SIZE
