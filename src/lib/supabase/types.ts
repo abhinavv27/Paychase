@@ -401,6 +401,44 @@ export interface Database {
           user_agent?: string | null
         }
       }
+      custom_templates: {
+        Row: {
+          id: string
+          user_id: string
+          name: string
+          language: string
+          escalation_level: 'gentle' | 'firm' | 'urgent'
+          message_text: string
+          variables: string[]
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          name: string
+          language: string
+          escalation_level: 'gentle' | 'firm' | 'urgent'
+          message_text: string
+          variables?: string[]
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          name?: string
+          language?: string
+          escalation_level?: 'gentle' | 'firm' | 'urgent'
+          message_text?: string
+          variables?: string[]
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+      }
       audit_log: {
         Row: {
           id: string
