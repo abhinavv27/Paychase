@@ -80,9 +80,10 @@ export async function saveTemplate(params: {
 export async function deleteTemplate(id: string) {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return
+  if (!user) throw new Error('Unauthorized')
 
-  await supabase.from('custom_templates').delete().eq('id', id).eq('user_id', user.id)
+  const { error } = await supabase.from('custom_templates').delete().eq('id', id).eq('user_id', user.id)
+  if (error) throw new Error(error.message)
   revalidatePath('/settings/templates')
 }
 

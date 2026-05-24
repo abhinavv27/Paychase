@@ -43,12 +43,12 @@ export function TemplateEditor({ initialData, onSave, onCancel }: TemplateEditor
 
   const handlePreview = () => {
     let text = messageText
-    text = text.replace('{clientName}', 'Acme Corp')
-    text = text.replace('{invoiceNumber}', 'INV-001')
-    text = text.replace('{amount}', '₹50,000')
-    text = text.replace('{dueDate}', '15 Jun 2026')
-    text = text.replace('{overdueDays}', '10')
-    text = text.replace('{paymentLink}', 'https://pay.example.com/link')
+    text = text.replaceAll('{clientName}', 'Acme Corp')
+    text = text.replaceAll('{invoiceNumber}', 'INV-001')
+    text = text.replaceAll('{amount}', '₹50,000')
+    text = text.replaceAll('{dueDate}', '15 Jun 2026')
+    text = text.replaceAll('{overdueDays}', '10')
+    text = text.replaceAll('{paymentLink}', 'https://pay.example.com/link')
     setPreview(text)
   }
 
