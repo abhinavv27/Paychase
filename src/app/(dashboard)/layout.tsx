@@ -12,6 +12,8 @@ import {
   Menu,
 } from 'lucide-react'
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
+import { headers } from 'next/headers'
 
 const navItems = [
   { href: '/', label: 'Overview', icon: LayoutDashboard },
@@ -51,6 +53,21 @@ export default async function DashboardLayout({
 }) {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
+
+  const headersList = await headers()
+  const pathname = headersList.get('next-url') || ''
+
+  if (user && !pathname.includes('/onboarding') && !pathname.includes('/api/')) {
+    const { data: profile } = await supabase
+      .from('users')
+      .select('company_name')
+      .eq('id', user.id)
+      .single()
+
+    if (profile && profile.company_name === null) {
+      redirect('/onboarding')
+    }
+  }
 
   let pendingCount = 0
   if (user) {
