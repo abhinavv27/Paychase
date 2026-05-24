@@ -3,6 +3,8 @@ import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import Link from "next/link"
 import { ArrowLeft, Clock } from "lucide-react"
+
+export const revalidate = 300
 import { ApproveButton, DismissButton } from "@/components/approvals/draft-actions"
 import { DeliveryStatus } from "@/components/approvals/delivery-status"
 
