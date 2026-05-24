@@ -4,7 +4,7 @@ import { CheckCircle, XCircle, RefreshCw } from 'lucide-react'
 import Link from 'next/link'
 
 interface ImportResultViewProps {
-  result: { imported: number; errors: { row: number; message: string }[]; skipped: number }
+  result: { imported: number; errors: { row: number; message: string }[] }
   onReset: () => void
 }
 

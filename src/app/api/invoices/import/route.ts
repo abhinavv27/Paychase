@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
     const { rows, errors: parseErrors } = await parseCsvContent(content)
 
     if (rows.length === 0) {
-      return NextResponse.json({ imported: 0, errors: parseErrors, skipped: 0 })
+      return NextResponse.json({ imported: 0, errors: parseErrors })
     }
 
     if (rows.length > 500) {
