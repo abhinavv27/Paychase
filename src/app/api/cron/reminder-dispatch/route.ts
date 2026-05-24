@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient, asDb } from '@/lib/supabase/admin'
 import { requireCronAuth, apiError } from '@/lib/api-helpers'
 import { generateFollowUpMessage } from '@/lib/ai/message-generator'
+import type { Language } from '@/lib/ai/translations'
 import { getOptimalSendTime } from '@/lib/ai/smart-timing'
 import { sendEmail, paymentReminderEmail } from '@/lib/email'
 
@@ -23,7 +24,7 @@ export async function GET(request: NextRequest) {
     while (hasMore) {
       const { data: overdueInvoices, error } = await supabase
         .from('invoices')
-        .select('*, client:clients(name, phone, email, on_time_rate, risk_score)')
+        .select('*, client:clients(name, phone, email, on_time_rate, risk_score, preferred_language)')
         .eq('status', 'pending')
         .lt('due_date', today)
         .range(offset, offset + BATCH_SIZE - 1)
@@ -171,6 +172,7 @@ export async function GET(request: NextRequest) {
             onTimeRate: Number(client.on_time_rate || 0),
             reminderCount: 0,
             userStyle: userStyle as 'casual' | 'professional' | 'formal',
+            language: (client.preferred_language as Language) || 'en',
           }
 
           const aiMessage = generateFollowUpMessage(messageContext)
