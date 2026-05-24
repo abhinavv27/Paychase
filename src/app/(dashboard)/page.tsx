@@ -142,6 +142,8 @@ export default async function OverviewPage() {
     .filter((c) => (c.risk_score ?? 0) >= 70)
     .reduce((sum, c) => sum + (c.total_outstanding ?? 0), 0)
 
+  const cashFlowForecast = Math.round(totalOutstanding * (recoveryRate / 100))
+
   const healthScore = calculateCollectionHealth({
     dso,
     recoveryRate,
@@ -201,8 +203,32 @@ export default async function OverviewPage() {
         </div>
       </div>
 
-      {/* Collection Health */}
+      {/* Metrics Row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+          <p className="text-sm font-medium text-gray-500">Cash Flow Forecast (30d)</p>
+          <p className="mt-2 text-3xl font-bold text-indigo-600">
+            {formatINR(cashFlowForecast)}
+          </p>
+          <p className="mt-1 text-sm text-gray-500">Risk-weighted expected collection</p>
+        </div>
+
+        <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+          <p className="text-sm font-medium text-gray-500">Recovery Rate</p>
+          <p className="mt-2 text-3xl font-bold text-green-600">
+            {recoveryRate}%
+          </p>
+          <p className="mt-1 text-sm text-gray-500">Invoices paid</p>
+        </div>
+
+        <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+          <p className="text-sm font-medium text-gray-500">Avg Collection Time</p>
+          <p className="mt-2 text-3xl font-bold text-gray-900">
+            {dso} days
+          </p>
+          <p className="mt-1 text-sm text-gray-500">Days to payment</p>
+        </div>
+
         <HealthScore score={healthScore.score} level={healthScore.level} />
       </div>
 
