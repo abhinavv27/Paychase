@@ -53,7 +53,6 @@ export function parseCommand(message: string): ParsedCommand {
     let dueDate: string | undefined
     let amount: number | undefined
     let phone: string | undefined
-    let name: string
 
     if (dueDateMatch) {
       dueDate = parts.pop()!
@@ -67,7 +66,7 @@ export function parseCommand(message: string): ParsedCommand {
       phone = parts.pop()!
     }
 
-    name = parts.join(' ')
+    const name = parts.join(' ')
 
     return {
       command: 'add_client',

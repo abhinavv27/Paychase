@@ -1,9 +1,37 @@
 import { generateFollowUpMessage } from '@/lib/ai'
 import type { MessageContext } from '@/lib/ai'
-import { sendWhatsAppMessage } from '@/lib/whatsapp/client'
 import { formatPhoneForWhatsApp } from '@/lib/whatsapp/deep-link'
+import { createAdminClient, asDb } from '@/lib/supabase/admin'
+import { sendTextMessage } from '@/lib/whatsapp/client'
 
-export async function handleStatusCommand(supabase: any, userId: string): Promise<string> {
+interface InvoiceWithClient {
+  id: string
+  user_id: string
+  client_id: string
+  invoice_number: string
+  amount: number
+  currency: string
+  issue_date: string
+  due_date: string
+  status: string
+  paid_amount: number | null
+  payment_date: string | null
+  payment_method: string | null
+  upi_link: string | null
+  reminder_count: number | null
+  last_reminder_sent: string | null
+  created_at: string
+  updated_at: string
+  client: {
+    name: string
+    phone: string | null
+    email: string | null
+    on_time_rate: number | null
+    risk_score: number | null
+  } | null
+}
+
+export async function handleStatusCommand(supabase: ReturnType<typeof createAdminClient>, userId: string): Promise<string> {
   const today = new Date().toISOString().split('T')[0]
 
   const { data: overdueInvoices, error } = await supabase
@@ -15,38 +43,40 @@ export async function handleStatusCommand(supabase: any, userId: string): Promis
     .order('due_date', { ascending: true })
 
   if (error || !overdueInvoices || overdueInvoices.length === 0) {
-    return '✅ All caught up! No overdue invoices.'
+    return 'All caught up! No overdue invoices.'
   }
 
-  const totalOutstanding = overdueInvoices.reduce((sum: number, inv: any) => sum + inv.amount, 0)
+  const typedInvoices = overdueInvoices as InvoiceWithClient[]
+  const totalOutstanding = typedInvoices.reduce((sum: number, inv) => sum + inv.amount, 0)
 
-  let response = `📊 *Overdue Invoices*\n\n`
-  response += `💰 Total outstanding: *₹${totalOutstanding.toLocaleString('en-IN')}*\n`
-  response += `📋 ${overdueInvoices.length} invoice${overdueInvoices.length > 1 ? 's' : ''} overdue\n\n`
+  let response = `Overdue Invoices\n\n`
+  response += `Total outstanding: Rs.${totalOutstanding.toLocaleString('en-IN')}\n`
+  response += `${typedInvoices.length} invoice${typedInvoices.length > 1 ? 's' : ''} overdue\n\n`
 
-  for (const inv of overdueInvoices.slice(0, 5)) {
+  for (const inv of typedInvoices.slice(0, 5)) {
     const client = inv.client
     const daysOverdue = Math.floor(
       (new Date(today).getTime() - new Date(inv.due_date).getTime()) / (1000 * 60 * 60 * 24)
     )
-    const riskEmoji = (client?.risk_score || 0.5) > 0.7 ? '🔴' : (client?.risk_score || 0.5) > 0.3 ? '🟡' : '🟢'
+    const riskScore = client?.risk_score || 0.5
+    const riskEmoji = riskScore > 0.7 ? 'HIGH' : riskScore > 0.3 ? 'MED' : 'LOW'
 
-    response += `${riskEmoji} *${client?.name}* — ₹${inv.amount.toLocaleString('en-IN')}\n`
-    response += `   Invoice: ${inv.invoice_number} · ${daysOverdue} days overdue\n`
+    response += `[${riskEmoji}] ${client?.name} - Rs.${inv.amount.toLocaleString('en-IN')}\n`
+    response += `   Invoice: ${inv.invoice_number} - ${daysOverdue} days overdue\n`
     response += `   On-time rate: ${((client?.on_time_rate || 0.5) * 100).toFixed(0)}%\n\n`
   }
 
-  if (overdueInvoices.length > 5) {
-    response += `...and ${overdueInvoices.length - 5} more\n\n`
+  if (typedInvoices.length > 5) {
+    response += `...and ${typedInvoices.length - 5} more\n\n`
   }
 
-  response += `Send *FOLLOWUP* to send reminders to all, or *FOLLOWUP [name]* for a specific client.`
+  response += `Reply FOLLOWUP to send reminders to all, or FOLLOWUP [name] for a specific client.`
 
   return response
 }
 
 export async function handleFollowupCommand(
-  supabase: any,
+  supabase: ReturnType<typeof createAdminClient>,
   userId: string,
   clientName: string | null
 ): Promise<string> {
@@ -68,16 +98,22 @@ export async function handleFollowupCommand(
   if (error || !overdueInvoices || overdueInvoices.length === 0) {
     return clientName
       ? `No overdue invoices found for "${clientName}".`
-      : '✅ No overdue invoices to follow up on.'
+      : 'No overdue invoices to follow up on.'
   }
+
+  const typedInvoices = overdueInvoices as InvoiceWithClient[]
 
   let sent = 0
   let failed = 0
+  const failedNames: string[] = []
 
-  for (const invoice of overdueInvoices) {
+  const db = asDb(supabase)
+
+  for (const invoice of typedInvoices) {
     const client = invoice.client
     if (!client?.phone) {
       failed++
+      failedNames.push(client?.name || 'Unknown')
       continue
     }
 
@@ -98,59 +134,72 @@ export async function handleFollowupCommand(
 
     const message = generateFollowUpMessage(context)
 
-    const { error: reminderError } = await supabase
-      .from('reminders')
-      .insert({
-        user_id: userId,
-        invoice_id: invoice.id,
-        client_id: invoice.client_id,
-        channel: 'whatsapp',
-        template_type: message.escalationLevel,
-        message_text: message.text,
-        language: 'en',
-        status: 'sent',
-        approval_status: 'sent',
-        sent_at: new Date().toISOString(),
-        sent_method: 'bot_command',
-      })
-
-    if (reminderError) {
-      failed++
-      continue
-    }
-
     try {
       const phone = formatPhoneForWhatsApp(client.phone)
-      await sendWhatsAppMessage({
-        phoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID!,
-        to: phone,
-        templateName: 'payment_reminder',
-        language: 'en',
-        components: [{
-          type: 'body',
-          parameters: [{ type: 'text', text: message.text }],
-        }],
-        accessToken: process.env.WHATSAPP_ACCESS_TOKEN!,
-      })
-      sent++
+      const result = await sendTextMessage(phone, message.text)
 
-      await supabase
+      const whatsappMessageId = result?.messages?.[0]?.id
+
+      const { error: reminderError } = await db
+        .from('reminders')
+        .insert({
+          user_id: userId,
+          invoice_id: invoice.id,
+          client_id: invoice.client_id,
+          channel: 'whatsapp',
+          template_type: message.escalationLevel,
+          message_text: message.text,
+          language: 'en',
+          status: 'sent',
+          approval_status: 'sent',
+          sent_at: new Date().toISOString(),
+          sent_method: 'bot_command',
+          whatsapp_message_id: whatsappMessageId,
+        } as Record<string, unknown>)
+
+      if (reminderError) {
+        console.error(`Failed to log reminder for ${client.name}:`, reminderError)
+      }
+
+      const { error: updateError } = await db
         .from('invoices')
         .update({
           reminder_count: (invoice.reminder_count || 0) + 1,
           last_reminder_sent: new Date().toISOString(),
-        })
+        } as Record<string, unknown>)
         .eq('id', invoice.id)
+
+      if (updateError) {
+        console.error(`Failed to update reminder count for invoice ${invoice.id}:`, updateError)
+      }
+
+      sent++
     } catch (error) {
       console.error(`Failed to send to ${client.name}:`, error)
       failed++
+      failedNames.push(client.name)
+
+      await db
+        .from('reminders')
+        .insert({
+          user_id: userId,
+          invoice_id: invoice.id,
+          client_id: invoice.client_id,
+          channel: 'whatsapp',
+          template_type: message.escalationLevel,
+          message_text: message.text,
+          language: 'en',
+          status: 'failed',
+          approval_status: 'rejected',
+          error_message: error instanceof Error ? error.message : 'Unknown error',
+        } as Record<string, unknown>)
     }
   }
 
-  let response = `✅ *Follow-ups sent!*\n\n`
-  response += `📤 Sent: ${sent}\n`
+  let response = `Follow-ups sent!\n\n`
+  response += `Sent: ${sent}\n`
   if (failed > 0) {
-    response += `❌ Failed: ${failed} (no phone number or API error)\n`
+    response += `Failed: ${failed} (${failedNames.join(', ')})\n`
   }
   response += `\nI'll notify you when clients respond.`
 
@@ -158,47 +207,50 @@ export async function handleFollowupCommand(
 }
 
 export async function handleAddClientCommand(
-  supabase: any,
+  supabase: ReturnType<typeof createAdminClient>,
   userId: string,
   params: { clientName?: string; phone?: string; amount?: number; dueDate?: string }
 ): Promise<string> {
   const { clientName, phone, amount, dueDate } = params
 
   if (!clientName) {
-    return `❌ Please provide a client name.\n\n*Format:* ADD CLIENT [name] [phone] [amount] [due date]\n*Example:* ADD CLIENT Acme Corp 9876543210 50000 2026-06-15`
+    return `Please provide a client name.\n\nFormat: ADD CLIENT [name] [phone] [amount] [due date]\nExample: ADD CLIENT Acme Corp 9876543210 50000 2026-06-15`
   }
 
-  const { data: existingClient } = await supabase
+  const db = asDb(supabase)
+
+  const { data: existingClient } = await db
     .from('clients')
     .select('id')
     .eq('user_id', userId)
-    .ilike('name', clientName)
+    .ilike!('name', clientName)
     .single()
 
+  const typedExistingClient = existingClient as { id: string } | null
   let clientId: string
 
-  if (existingClient) {
-    clientId = existingClient.id
+  if (typedExistingClient) {
+    clientId = typedExistingClient.id
   } else {
-    const { data: newClient, error: clientError } = await supabase
+    const { data: newClient, error: clientError } = await db
       .from('clients')
       .insert({
         user_id: userId,
         name: clientName,
         phone: phone || null,
-      })
-      .select('id')
+      } as Record<string, unknown>)
+      .select!('id')
       .single()
 
     if (clientError) {
-      return `❌ Failed to add client: ${clientError.message}`
+      return `Failed to add client: ${clientError.message}`
     }
-    clientId = newClient.id
+    clientId = (newClient as { id: string }).id
   }
 
   if (amount && dueDate) {
     const invoiceNumber = `INV-${Date.now().toString().slice(-6)}`
-    const { error: invoiceError } = await supabase
+    const { error: invoiceError } = await asDb(supabase)
       .from('invoices')
       .insert({
         user_id: userId,
@@ -209,66 +261,81 @@ export async function handleAddClientCommand(
         issue_date: new Date().toISOString().split('T')[0],
         due_date: dueDate,
         status: 'pending',
-      })
+      } as Record<string, unknown>)
 
     if (invoiceError) {
-      return `❌ Failed to create invoice: ${invoiceError.message}`
+      return `Failed to create invoice: ${(invoiceError as { message: string }).message}`
     }
 
-    return `✅ Added *${clientName}* with invoice *${invoiceNumber}* for ₹${amount.toLocaleString('en-IN')} (due ${dueDate}).`
+    return `Added *${clientName}* with invoice *${invoiceNumber}* for Rs.${amount.toLocaleString('en-IN')} (due ${dueDate}).`
   }
 
-  return `✅ Added *${clientName}${phone ? ` (${phone})` : ''}.\n\nSend ADD CLIENT [name] [phone] [amount] [due date] to create an invoice.`
+  return `Added *${clientName}${phone ? ` (${phone})` : ''}.\n\nSend ADD CLIENT [name] [phone] [amount] [due date] to create an invoice.`
 }
 
 export async function handleMarkPaidCommand(
-  supabase: any,
+  supabase: ReturnType<typeof createAdminClient>,
   userId: string,
   invoiceNumber: string
 ): Promise<string> {
   if (!invoiceNumber) {
-    return `❌ Please provide an invoice number.\n\n*Format:* PAID [invoice number]\n*Example:* PAID INV-001`
+    return `Please provide an invoice number.\n\nFormat: PAID [invoice number]\nExample: PAID INV-001`
   }
 
-  const { data: invoice, error } = await supabase
+  const db = asDb(supabase)
+
+  const { data: invoice, error } = await db
     .from('invoices')
     .select('*, client:clients(name)')
     .eq('user_id', userId)
     .eq('invoice_number', invoiceNumber)
     .single()
 
-  if (error || !invoice) {
-    return `❌ Invoice *${invoiceNumber}* not found.`
+  const typedInvoice = invoice as {
+    id: string
+    status: string
+    amount: number
+    currency: string
+    client_id: string
+    client: { name: string } | null
+  } | null
+
+  if (error || !typedInvoice) {
+    return `Invoice *${invoiceNumber}* not found.`
   }
 
-  if (invoice.status === 'paid') {
-    return `ℹ️ Invoice *${invoiceNumber}* is already marked as paid.`
+  if (typedInvoice.status === 'paid') {
+    return `Invoice *${invoiceNumber}* is already marked as paid.`
   }
 
-  const { error: updateError } = await supabase
+  const { error: updateError } = await db
     .from('invoices')
     .update({
       status: 'paid',
-      paid_amount: invoice.amount,
+      paid_amount: typedInvoice.amount,
       payment_date: new Date().toISOString(),
-    })
-    .eq('id', invoice.id)
+    } as Record<string, unknown>)
+    .eq('id', typedInvoice.id)
 
   if (updateError) {
-    return `❌ Failed to mark as paid: ${updateError.message}`
+    return `Failed to mark as paid: ${(updateError as { message: string }).message}`
   }
 
-  await supabase
+  const { error: paymentError } = await db
     .from('payments')
     .insert({
       user_id: userId,
-      invoice_id: invoice.id,
-      client_id: invoice.client_id,
-      amount: invoice.amount,
-      currency: invoice.currency,
+      invoice_id: typedInvoice.id,
+      client_id: typedInvoice.client_id,
+      amount: typedInvoice.amount,
+      currency: typedInvoice.currency,
       method: 'manual',
       status: 'captured',
-    })
+    } as Record<string, unknown>)
 
-  return `✅ Marked *${invoiceNumber}* (₹${invoice.amount.toLocaleString('en-IN')}) as paid. Great work! 🎉`
+  if (paymentError) {
+    console.error('Failed to record payment:', paymentError)
+  }
+
+  return `Marked *${invoiceNumber}* (Rs.${typedInvoice.amount.toLocaleString('en-IN')}) as paid. Great work!`
 }

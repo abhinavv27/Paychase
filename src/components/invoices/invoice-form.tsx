@@ -1,8 +1,10 @@
 'use client'
 
+import { useState } from 'react'
 import { useFormState } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { createInvoiceAction, updateInvoiceAction } from '@/lib/invoices-actions'
+import { QuickCreateForm } from '@/components/clients/quick-create-form'
 import type { Database } from '@/lib/supabase/types'
 
 type InvoiceRow = Database['public']['Tables']['invoices']['Row']
@@ -22,35 +24,55 @@ export function InvoiceForm({ clients, initialData, nextInvoiceNumber }: Invoice
     : createInvoiceAction
 
   const [state, formAction, isPending] = useFormState(action, initialState)
+  const [localClients, setLocalClients] = useState(clients)
+  const [showQuickCreate, setShowQuickCreate] = useState(false)
+  const [selectedClientId, setSelectedClientId] = useState(initialData?.client_id || '')
+
+  const handleQuickCreated = (client: { id: string; name: string }) => {
+    setLocalClients(prev => [...prev, client])
+    setSelectedClientId(client.id)
+    setShowQuickCreate(false)
+  }
 
   return (
-    <form action={formAction} className="space-y-6">
-      {state?.error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-          {state.error}
-        </div>
-      )}
+    <>
+      <form action={formAction} className="space-y-6">
+        {state?.error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+            {state.error}
+          </div>
+        )}
 
-      <div className="space-y-4">
-        <div>
-          <label htmlFor="client_id" className="block text-sm font-medium text-gray-700">
-            Client <span className="text-red-500">*</span>
-          </label>
-          <select
-            id="client_id"
-            name="client_id"
-            defaultValue={initialData?.client_id || ''}
-            required
-            className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-          >
-            <option value="">Select a client</option>
-            {clients.map((client) => (
-              <option key={client.id} value={client.id}>
-                {client.name}
-              </option>
-            ))}
-          </select>
-        </div>
+        <div className="space-y-4">
+          <div>
+            <label htmlFor="client_id" className="block text-sm font-medium text-gray-700">
+              Client <span className="text-red-500">*</span>
+            </label>
+            <div className="flex gap-2">
+              <select
+                id="client_id"
+                name="client_id"
+                value={selectedClientId}
+                onChange={(e) => setSelectedClientId(e.target.value)}
+                required
+                className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              >
+                <option value="">Select a client</option>
+                {localClients.map((client) => (
+                  <option key={client.id} value={client.id}>
+                    {client.name}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={() => setShowQuickCreate(true)}
+                className="mt-1 inline-flex items-center px-3 py-2 rounded-lg bg-gray-100 text-gray-700 text-sm hover:bg-gray-200 transition-colors whitespace-nowrap"
+              >
+                + New Client
+              </button>
+            </div>
+          </div>
 
         <div>
           <label htmlFor="invoice_number" className="block text-sm font-medium text-gray-700">
@@ -132,5 +154,24 @@ export function InvoiceForm({ clients, initialData, nextInvoiceNumber }: Invoice
         </button>
       </div>
     </form>
+
+    {showQuickCreate && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-xl">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-gray-900">Create New Client</h2>
+            <button
+              type="button"
+              onClick={() => setShowQuickCreate(false)}
+              className="text-gray-400 hover:text-gray-600 text-lg leading-none"
+            >
+              &times;
+            </button>
+          </div>
+          <QuickCreateForm onCreated={handleQuickCreated} />
+        </div>
+      </div>
+    )}
+  </>
   )
 }

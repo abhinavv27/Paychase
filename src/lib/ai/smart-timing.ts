@@ -29,3 +29,28 @@ export function calculateOptimalSendHour(reminders: {
 
   return maxHour
 }
+
+export function getOptimalSendTime(reminders: Array<{ responded_at: string | null; sent_at: string | null }>): number {
+  if (reminders.length === 0) return 10
+
+  const hourResponses: Record<number, number> = {}
+  for (let h = 0; h < 24; h++) hourResponses[h] = 0
+
+  for (const r of reminders) {
+    if (r.responded_at && r.sent_at) {
+      const responseHour = new Date(r.responded_at).getHours()
+      hourResponses[responseHour]++
+    }
+  }
+
+  let bestHour = 10
+  let maxCount = 0
+  for (const [hour, count] of Object.entries(hourResponses)) {
+    if (count > maxCount) {
+      maxCount = count
+      bestHour = parseInt(hour)
+    }
+  }
+
+  return bestHour || 10
+}

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient, asDb } from '@/lib/supabase/admin'
 import { requireCronAuth, apiError } from '@/lib/api-helpers'
 import { generateFollowUpMessage } from '@/lib/ai/message-generator'
+import { getOptimalSendTime } from '@/lib/ai/smart-timing'
 
 const BATCH_SIZE = 100
 
@@ -40,13 +41,14 @@ export async function GET(request: NextRequest) {
         client: Record<string, unknown> | null
       }>
 
-      const draftsToInsert: Array<{
-        userId: string
-        invoiceId: string
-        clientId: string
-        messageText: string
-        daysOverdue: number
-      }> = []
+       const draftsToInsert: Array<{
+         userId: string
+         invoiceId: string
+         clientId: string
+         messageText: string
+         daysOverdue: number
+         scheduledSendAt: string | null
+       }> = []
 
       for (const invoice of typedInvoices) {
         try {
@@ -78,9 +80,29 @@ export async function GET(request: NextRequest) {
           if (!typedUser?.phone) continue
           if (typedUser.plan === 'paused') continue
 
-          const userStyle = (typedUser?.style_preference as string) || 'professional'
+           const userStyle = (typedUser?.style_preference as string) || 'professional'
 
-          // Check rate limit per user (max 1 draft batch per 4 hours)
+           // Fetch client's past reminders for smart timing
+           const { data: pastReminders } = await supabase
+             .from('reminders')
+             .select('sent_at, responded_at')
+             .eq('client_id', invoice.client_id)
+             .not('sent_at', 'is', null)
+             .order('sent_at', { ascending: false })
+             .limit(50)
+
+           const typedPastReminders = (pastReminders || []) as Array<{
+             sent_at: string | null
+             responded_at: string | null
+           }>
+
+           const optimalHour = getOptimalSendTime(typedPastReminders)
+           const tomorrow = new Date()
+           tomorrow.setDate(tomorrow.getDate() + 1)
+           tomorrow.setHours(optimalHour, 0, 0, 0)
+           const scheduledSendAt = tomorrow.toISOString()
+
+           // Check rate limit per user (max 1 draft batch per 4 hours)
           const { count: recentDrafts } = await supabase
             .from('reminders')
             .select('*', { count: 'exact', head: true })
@@ -106,13 +128,14 @@ export async function GET(request: NextRequest) {
 
           const aiMessage = generateFollowUpMessage(messageContext)
 
-          draftsToInsert.push({
-            userId,
-            invoiceId: invoice.id,
-            clientId: invoice.client_id,
-            messageText: aiMessage.text,
-            daysOverdue,
-          })
+           draftsToInsert.push({
+             userId,
+             invoiceId: invoice.id,
+             clientId: invoice.client_id,
+             messageText: aiMessage.text,
+             daysOverdue,
+             scheduledSendAt,
+           })
         } catch (loopError) {
           console.error('Failed to process draft for invoice:', invoice.id, loopError)
         }
@@ -121,18 +144,19 @@ export async function GET(request: NextRequest) {
       // Sort by urgency (most overdue first = earlier in the day ordering)
       draftsToInsert.sort((a, b) => b.daysOverdue - a.daysOverdue)
 
-      for (const draft of draftsToInsert) {
-        const { error: insertError } = await asDb(supabase).from('reminders').insert({
-          user_id: draft.userId,
-          invoice_id: draft.invoiceId,
-          client_id: draft.clientId,
-          channel: 'whatsapp',
-          template_type: 'payment_followup',
-          message_text: draft.messageText,
-          language: 'en',
-          status: 'draft',
-          approval_status: 'draft',
-        } as Record<string, unknown>)
+       for (const draft of draftsToInsert) {
+         const { error: insertError } = await asDb(supabase).from('reminders').insert({
+           user_id: draft.userId,
+           invoice_id: draft.invoiceId,
+           client_id: draft.clientId,
+           channel: 'whatsapp',
+           template_type: 'payment_followup',
+           message_text: draft.messageText,
+           language: 'en',
+           status: 'draft',
+           approval_status: 'draft',
+           scheduled_send_at: draft.scheduledSendAt,
+         } as Record<string, unknown>)
 
         if (insertError) {
           console.error('Failed to insert draft:', insertError)

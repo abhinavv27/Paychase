@@ -7,7 +7,9 @@ export async function withRateLimit(
   maxRequests: number = 100,
   windowSeconds: number = 60
 ): Promise<NextResponse | null> {
-  const ip = request.headers.get('x-forwarded-for') || 'unknown'
+  // Take the first (client) IP from the comma-separated X-Forwarded-For chain
+  const forwardedFor = request.headers.get('x-forwarded-for') || 'unknown'
+  const ip = forwardedFor.split(',')[0].trim()
   const rateLimitKey = `ratelimit:${key}:${ip}`
 
   const result = await rateLimit(rateLimitKey, { maxRequests, windowSeconds })

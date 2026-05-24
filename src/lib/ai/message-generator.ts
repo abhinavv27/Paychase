@@ -1,5 +1,3 @@
-import { getSentimentTone, SentimentTone } from './sentiment-templates'
-
 export interface MessageContext {
   clientName: string
   invoiceNumber: string
@@ -15,13 +13,13 @@ export interface MessageContext {
 
 export interface GeneratedMessage {
   text: string
-  tone: SentimentTone
   escalationLevel: 'gentle' | 'firm' | 'urgent'
-  suggestedSendTime?: string
+  suggestedSendTime: string | null
+  tone: 'casual' | 'professional' | 'formal'
 }
 
 export function generateFollowUpMessage(context: MessageContext): GeneratedMessage {
-  const { clientName, invoiceNumber, amount, dueDate, daysOverdue, onTimeRate, reminderCount, lastResponse, userStyle = 'professional', upiLink } = context
+  const { clientName, invoiceNumber, amount, dueDate, daysOverdue, reminderCount, lastResponse, userStyle = 'professional', upiLink } = context
 
   let escalationLevel: 'gentle' | 'firm' | 'urgent' = 'gentle'
 
@@ -37,9 +35,6 @@ export function generateFollowUpMessage(context: MessageContext): GeneratedMessa
     escalationLevel = escalationLevel === 'gentle' ? 'firm' : 'urgent'
   }
 
-  const tone = escalationLevel === 'gentle' ? 'friendly' :
-               escalationLevel === 'firm' ? 'professional' : 'firm'
-
   const text = generateMessageText({
     clientName,
     invoiceNumber,
@@ -48,11 +43,17 @@ export function generateFollowUpMessage(context: MessageContext): GeneratedMessa
     daysOverdue,
     escalationLevel,
     userStyle,
-    lastResponse,
     upiLink,
   })
 
-  return { text, tone, escalationLevel }
+  return { 
+  text, 
+  escalationLevel, 
+  suggestedSendTime: null, 
+  tone: escalationLevel === 'gentle' ? 'casual' : 
+        escalationLevel === 'firm' ? 'professional' : 
+        'formal' 
+}
 }
 
 function generateMessageText(params: {
@@ -63,10 +64,9 @@ function generateMessageText(params: {
   daysOverdue: number
   escalationLevel: 'gentle' | 'firm' | 'urgent'
   userStyle: 'casual' | 'professional' | 'formal'
-  lastResponse?: string
   upiLink?: string
 }): string {
-  const { clientName, invoiceNumber, amount, dueDate, daysOverdue, escalationLevel, userStyle, lastResponse, upiLink } = params
+  const { clientName, invoiceNumber, amount, dueDate, daysOverdue, escalationLevel, userStyle, upiLink } = params
 
   const amountStr = `₹${amount.toLocaleString('en-IN')}`
   const dateStr = daysOverdue > 0 ? `${daysOverdue} days ago` : dueDate

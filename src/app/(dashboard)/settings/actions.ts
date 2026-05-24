@@ -34,16 +34,14 @@ export async function deleteAccountAction() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Unauthorized' }
 
-  const tables = ['audit_log', 'consent_log', 'ai_predictions', 'payments', 'reminders', 'invoices', 'clients']
-  for (const table of tables) {
-    await supabase.from(table).delete().eq('user_id', user.id)
-  }
-
-  await supabase.from('users').delete().eq('id', user.id)
-
   const admin = createAdminClient()
-  const { error: adminError } = await admin.auth.admin.deleteUser(user.id)
-  if (adminError) return { error: adminError.message }
+  const { error: authError } = await admin.auth.admin.deleteUser(user.id)
+  if (authError) return { error: authError.message }
+
+  const tables = ['audit_log', 'consent_log', 'ai_predictions', 'payments', 'reminders', 'invoices', 'clients', 'users']
+  for (const table of tables) {
+    await supabase.from(table).delete().eq('id', user.id)
+  }
 
   revalidatePath('/')
   redirect('/login?message=Account deleted successfully')

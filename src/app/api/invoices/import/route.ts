@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { withRateLimit } from '@/lib/rate-limit-middleware'
 import { createClient } from '@/lib/supabase/server'
+import { apiError } from '@/lib/api-helpers'
 import { validateCsvContent } from '@/lib/csv/import'
 
 export async function POST(request: NextRequest) {
@@ -10,14 +11,14 @@ export async function POST(request: NextRequest) {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    return apiError('Unauthorized', 401)
   }
 
   const body = await request.json()
   const { content } = body
 
   if (!content) {
-    return NextResponse.json({ error: 'No CSV content' }, { status: 400 })
+    return apiError('No CSV content', 400)
   }
 
   const validation = validateCsvContent(content, user.id)
@@ -32,7 +33,7 @@ export async function POST(request: NextRequest) {
       .from('clients')
       .insert(validation.clients)
     if (clientError) {
-      return NextResponse.json({ error: clientError.message }, { status: 500 })
+      return apiError(clientError.message, 500)
     }
   }
 
@@ -61,7 +62,7 @@ export async function POST(request: NextRequest) {
       .from('invoices')
       .insert(invoicesWithClientIds)
     if (invoiceError) {
-      return NextResponse.json({ error: invoiceError.message }, { status: 500 })
+      return apiError(invoiceError.message, 500)
     }
   }
 

@@ -22,7 +22,7 @@ describe('message generator edge cases', () => {
     }))
 
     expect(result.escalationLevel).toBe('gentle')
-    expect(result.tone).toBe('friendly')
+    expect(result.tone).toBe('casual')
     expect(result.text).toContain('friendly reminder')
   })
 
@@ -55,7 +55,7 @@ describe('message generator edge cases', () => {
     }))
 
     expect(result.escalationLevel).toBe('gentle')
-    expect(result.tone).toBe('friendly')
+    expect(result.tone).toBe('casual')
     expect(result.text).toContain('2026-05-01')
   })
 
@@ -66,7 +66,7 @@ describe('message generator edge cases', () => {
     }))
 
     expect(result.escalationLevel).toBe('urgent')
-    expect(result.tone).toBe('firm')
+    expect(result.tone).toBe('formal')
     expect(result.text).toContain('90 days overdue')
   })
 

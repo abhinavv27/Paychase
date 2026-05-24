@@ -1,83 +1,131 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { apiError } from '@/lib/api-helpers'
+import { createAdminClient, asDb } from '@/lib/supabase/admin'
 import crypto from 'crypto'
+
+const POSTGRES_DUPLICATE_ERROR = '23505'
 
 export async function POST(request: NextRequest) {
   const body = await request.text()
   const signature = request.headers.get('x-razorpay-signature') || ''
 
+  const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET
+  if (!webhookSecret) {
+    console.error('RAZORPAY_WEBHOOK_SECRET not configured')
+    return apiError('Server misconfiguration', 500)
+  }
+
   const expectedSignature = crypto
-    .createHmac('sha256', process.env.RAZORPAY_WEBHOOK_SECRET!)
+    .createHmac('sha256', webhookSecret)
     .update(body)
     .digest('hex')
 
-  if (signature !== expectedSignature) {
-    return NextResponse.json({ error: 'Invalid signature' }, { status: 400 })
+  // Timing-safe comparison to prevent timing attacks
+  if (
+    signature.length !== expectedSignature.length ||
+    !crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSignature))
+  ) {
+    return apiError('Invalid signature', 400)
   }
 
-  const event = JSON.parse(body)
-  const { event: eventType, payload } = event
+  let event: Record<string, unknown>
+  try {
+    event = JSON.parse(body)
+  } catch {
+    return apiError('Invalid JSON', 400)
+  }
+
+  const eventType = event.event as string | undefined
+  const payload = event.payload as Record<string, unknown> | undefined
 
   if (eventType !== 'payment.captured') {
     return NextResponse.json({ status: 'ignored' })
   }
 
-  const payment = payload.payment?.entity
-  if (!payment) {
-    return NextResponse.json({ error: 'Invalid payload' }, { status: 400 })
+  if (!payload) {
+    return apiError('Invalid payload', 400)
   }
 
-  const supabase = createClient()
+  const payment = (payload as Record<string, unknown>).payment as Record<string, unknown> | undefined
+  const paymentEntity = payment?.entity as Record<string, unknown> | undefined
+  if (!paymentEntity) {
+    return apiError('Invalid payload', 400)
+  }
 
-  const { error: paymentError } = await supabase
+  const db = asDb(createAdminClient())
+
+  const notes = paymentEntity.notes as Record<string, unknown> | undefined
+
+  // Idempotency: check if payment already exists before inserting
+  const { data: existingPayment } = await db
+    .from('payments')
+    .select('id')
+    .eq('razorpay_payment_id', paymentEntity.id as string)
+    .single()
+
+  if (existingPayment) {
+    return NextResponse.json({ status: 'duplicate' })
+  }
+
+  const { error: paymentError } = await db
     .from('payments')
     .insert({
-      amount: payment.amount / 100,
-      currency: payment.currency,
-      method: payment.method,
-      razorpay_payment_id: payment.id,
-      razorpay_order_id: payment.order_id,
-      razorpay_signature: payment.signature,
-      status: payment.status,
-      captured_at: new Date(payment.created_at * 1000).toISOString(),
-      user_id: payment.notes?.user_id || '',
-      invoice_id: payment.notes?.invoice_id || '',
-      client_id: payment.notes?.client_id || '',
+      amount: (paymentEntity.amount as number) / 100,
+      currency: paymentEntity.currency as string,
+      method: paymentEntity.method as string,
+      razorpay_payment_id: paymentEntity.id as string,
+      razorpay_order_id: paymentEntity.order_id as string,
+      razorpay_signature: paymentEntity.signature as string,
+      status: paymentEntity.status as string,
+      captured_at: new Date((paymentEntity.created_at as number) * 1000).toISOString(),
+      user_id: (notes?.user_id as string) || '',
+      invoice_id: (notes?.invoice_id as string) || '',
+      client_id: (notes?.client_id as string) || '',
     })
 
   if (paymentError) {
-    if (paymentError.code === '23505') {
+    if (paymentError.code === POSTGRES_DUPLICATE_ERROR) {
       return NextResponse.json({ status: 'duplicate' })
     }
     console.error('Failed to record payment:', paymentError)
-    return NextResponse.json({ error: 'Failed to record payment' }, { status: 500 })
+    return apiError('Failed to record payment', 500)
   }
 
-  if (payment.notes?.invoice_id) {
-    await supabase
+  if (notes?.invoice_id) {
+    // Idempotent: only update if not already paid
+    const { error: updateError } = await db
       .from('invoices')
       .update({
         status: 'paid',
-        paid_amount: payment.amount / 100,
+        paid_amount: (paymentEntity.amount as number) / 100,
         payment_date: new Date().toISOString(),
-        payment_method: payment.method,
+        payment_method: paymentEntity.method as string,
       })
-      .eq('id', payment.notes.invoice_id)
+      .eq('id', notes.invoice_id as string)
+      .neq('status', 'paid')
+
+    if (updateError) {
+      console.error('Failed to update invoice status:', updateError)
+    }
   }
 
-  await supabase
+  const { error: auditError } = await db
     .from('audit_log')
     .insert({
-      user_id: payment.notes?.user_id || '',
+      user_id: (notes?.user_id as string) || '',
       action: 'payment_received',
       entity_type: 'payment',
-      entity_id: payment.id,
+      entity_id: paymentEntity.id as string,
       details: {
-        amount: payment.amount / 100,
-        method: payment.method,
-        invoice_id: payment.notes?.invoice_id,
+        amount: (paymentEntity.amount as number) / 100,
+        method: paymentEntity.method as string,
+        invoice_id: notes?.invoice_id as string,
       },
-    })
+    } as Record<string, unknown>)
+
+  if (auditError) {
+    console.error('Failed to insert audit log:', auditError)
+  }
 
   return NextResponse.json({ status: 'ok' })
 }

@@ -210,71 +210,74 @@ export interface Database {
           updated_at?: string
         }
       }
-      reminders: {
-        Row: {
-          id: string
-          user_id: string
-          invoice_id: string
-          client_id: string
-          channel: string
-          template_type: string
-          message_text: string
-          language: string
-          sent_at: string | null
-          delivered_at: string | null
-          read_at: string | null
-          responded_at: string | null
-          status: string
-          whatsapp_message_id: string | null
-          error_message: string | null
-          created_at: string
-          approval_status: string
-          sent_method: string | null
-          user_edited: boolean
-        }
-        Insert: {
-          id?: string
-          user_id: string
-          invoice_id: string
-          client_id: string
-          channel: string
-          template_type: string
-          message_text: string
-          language?: string
-          sent_at?: string | null
-          delivered_at?: string | null
-          read_at?: string | null
-          responded_at?: string | null
-          status?: string
-          whatsapp_message_id?: string | null
-          error_message?: string | null
-          created_at?: string
-          approval_status?: string
-          sent_method?: string | null
-          user_edited?: boolean
-        }
-        Update: {
-          id?: string
-          user_id?: string
-          invoice_id?: string
-          client_id?: string
-          channel?: string
-          template_type?: string
-          message_text?: string
-          language?: string
-          sent_at?: string | null
-          delivered_at?: string | null
-          read_at?: string | null
-          responded_at?: string | null
-          status?: string
-          whatsapp_message_id?: string | null
-          error_message?: string | null
-          created_at?: string
-          approval_status?: string
-          sent_method?: string | null
-          user_edited?: boolean
-        }
-      }
+       reminders: {
+         Row: {
+           id: string
+           user_id: string
+           invoice_id: string
+           client_id: string
+           channel: string
+           template_type: string
+           message_text: string
+           language: string
+           sent_at: string | null
+           delivered_at: string | null
+           read_at: string | null
+           responded_at: string | null
+           scheduled_send_at: string | null
+           status: string
+           whatsapp_message_id: string | null
+           error_message: string | null
+           created_at: string
+           approval_status: string
+           sent_method: string | null
+           user_edited: boolean
+         }
+         Insert: {
+           id?: string
+           user_id: string
+           invoice_id: string
+           client_id: string
+           channel: string
+           template_type: string
+           message_text: string
+           language?: string
+           sent_at?: string | null
+           delivered_at?: string | null
+           read_at?: string | null
+           responded_at?: string | null
+           scheduled_send_at?: string | null
+           status?: string
+           whatsapp_message_id?: string | null
+           error_message?: string | null
+           created_at?: string
+           approval_status?: string
+           sent_method?: string | null
+           user_edited?: boolean
+         }
+         Update: {
+           id?: string
+           user_id?: string
+           invoice_id?: string
+           client_id?: string
+           channel?: string
+           template_type?: string
+           message_text?: string
+           language?: string
+           sent_at?: string | null
+           delivered_at?: string | null
+           read_at?: string | null
+           responded_at?: string | null
+           scheduled_send_at?: string | null
+           status?: string
+           whatsapp_message_id?: string | null
+           error_message?: string | null
+           created_at?: string
+           approval_status?: string
+           sent_method?: string | null
+           user_edited?: boolean
+         }
+       }
       payments: {
         Row: {
           id: string
