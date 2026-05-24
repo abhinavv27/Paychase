@@ -4,6 +4,8 @@ import { Suspense } from 'react'
 import Link from 'next/link'
 import { RiskCards } from '@/components/clients/risk-cards'
 
+export const revalidate = 300
+
 export const metadata: Metadata = {
   title: 'Clients',
 }

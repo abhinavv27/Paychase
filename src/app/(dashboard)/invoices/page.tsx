@@ -3,6 +3,8 @@ import { createClient } from '@/lib/supabase/server'
 import { calculatePaymentProbability } from '@/lib/ai/payment-probability'
 import Link from 'next/link'
 import type { Database } from '@/lib/supabase/types'
+
+export const revalidate = 300
 import { InvoiceTableShell } from './invoice-table-shell'
 
 export const metadata: Metadata = {
