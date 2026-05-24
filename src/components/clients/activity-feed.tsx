@@ -22,16 +22,19 @@ const eventConfig: Record<string, { icon: React.ElementType; label: string; colo
 export function ActivityFeed({ clientId }: { clientId: string }) {
   const [events, setEvents] = useState<ActivityEvent[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
   useEffect(() => {
     fetch(`/api/clients/${clientId}/events`)
       .then((r) => r.json())
       .then((data) => setEvents(data.events || []))
-      .catch(() => setEvents([]))
+      .catch(() => setError('Failed to load activity'))
       .finally(() => setLoading(false))
   }, [clientId])
 
   if (loading) return <div className="flex justify-center py-8"><Loader2 className="w-5 h-5 animate-spin text-gray-400" /></div>
+
+  if (error) return <p className="text-sm text-red-400 text-center py-8">{error}</p>
 
   if (events.length === 0) return <p className="text-sm text-gray-400 text-center py-8">No activity yet</p>
 
