@@ -1,11 +1,22 @@
 import { NextRequest } from 'next/server'
+import crypto from 'crypto'
 
 describe('WhatsApp Webhook Handler', () => {
   const originalEnv = process.env
 
+  function createValidSignature(body: string): string {
+    const appSecret = process.env.WHATSAPP_APP_SECRET || 'test_app_secret'
+    const hash = crypto.createHmac('sha256', appSecret).update(body).digest('hex')
+    return `sha256=${hash}`
+  }
+
   beforeEach(() => {
     jest.resetModules()
-    process.env = { ...originalEnv, WHATSAPP_WEBHOOK_VERIFY_TOKEN: 'test_verify_token' }
+    process.env = {
+      ...originalEnv,
+      WHATSAPP_WEBHOOK_VERIFY_TOKEN: 'test_verify_token',
+      WHATSAPP_APP_SECRET: 'test_app_secret',
+    }
   })
 
   afterAll(() => {
@@ -103,14 +114,17 @@ describe('WhatsApp Webhook Handler', () => {
       const mockEq = jest.fn().mockResolvedValue({ data: null, error: null })
       mockUpdate.mockReturnValue({ eq: mockEq })
 
+      const mockSelect = jest.fn().mockReturnValue({ eq: mockEq, or: mockEq, single: mockEq })
       const mockFrom = jest.fn().mockReturnValue({
         update: mockUpdate,
+        select: mockSelect,
       })
-      const mockCreateClient = jest.fn().mockReturnValue({ from: mockFrom })
+      const mockCreateAdminClient = jest.fn().mockReturnValue({ from: mockFrom })
 
-      jest.mock('@/lib/supabase/server', () => ({
-        createClient: mockCreateClient,
-      }))
+      jest.mock('@/lib/supabase/admin', () => ({
+        createAdminClient: mockCreateAdminClient,
+        asDb: jest.fn((c: any) => c),
+        }))
 
       jest.mock('next/server', () => ({
         NextRequest: class NextRequest {
@@ -120,8 +134,13 @@ describe('WhatsApp Webhook Handler', () => {
             this.url = url
             this.init = init
           }
-          async json() { return this.init.body }
-          headers = { get: () => null }
+          async text() { return this.init.body }
+          headers = { get: (name: string) => {
+            if (name === 'x-hub-signature-256' && this.init.headers) {
+              return (this.init.headers as Record<string, string>)['x-hub-signature-256']
+            }
+            return null
+          }}
         },
         NextResponse: {
           json: (body: any, init?: { status?: number }) => ({
@@ -154,9 +173,13 @@ describe('WhatsApp Webhook Handler', () => {
         ],
       }
 
+      const bodyStr = JSON.stringify(body)
       const request = new NextRequest('http://localhost/api/webhooks/whatsapp', {
         method: 'POST',
-        body: JSON.stringify(body),
+        body: bodyStr,
+        headers: {
+          'x-hub-signature-256': createValidSignature(bodyStr),
+        },
       })
 
       const response = await POST(request as any)
@@ -183,9 +206,10 @@ describe('WhatsApp Webhook Handler', () => {
       })
       const mockCreateClient = jest.fn().mockReturnValue({ from: mockFrom })
 
-      jest.mock('@/lib/supabase/server', () => ({
-        createClient: mockCreateClient,
-      }))
+      jest.mock('@/lib/supabase/admin', () => ({
+        createAdminClient: mockCreateClient,
+        asDb: jest.fn((c: any) => c),
+        }))
 
       jest.mock('next/server', () => ({
         NextRequest: class NextRequest {
@@ -195,8 +219,13 @@ describe('WhatsApp Webhook Handler', () => {
             this.url = url
             this.init = init
           }
-          async json() { return this.init.body }
-          headers = { get: () => null }
+          async text() { return this.init.body }
+          headers = { get: (name: string) => {
+            if (name === 'x-hub-signature-256' && this.init.headers) {
+              return (this.init.headers as Record<string, string>)['x-hub-signature-256']
+            }
+            return null
+          }}
         },
         NextResponse: {
           json: (body: any, init?: { status?: number }) => ({
@@ -229,9 +258,13 @@ describe('WhatsApp Webhook Handler', () => {
         ],
       }
 
+      const bodyStr2 = JSON.stringify(body)
       const request = new NextRequest('http://localhost/api/webhooks/whatsapp', {
         method: 'POST',
-        body: JSON.stringify(body),
+        body: bodyStr2,
+        headers: {
+          'x-hub-signature-256': createValidSignature(bodyStr2),
+        },
       })
 
       const response = await POST(request as any)
@@ -254,9 +287,10 @@ describe('WhatsApp Webhook Handler', () => {
       })
       const mockCreateClient = jest.fn().mockReturnValue({ from: mockFrom })
 
-      jest.mock('@/lib/supabase/server', () => ({
-        createClient: mockCreateClient,
-      }))
+      jest.mock('@/lib/supabase/admin', () => ({
+        createAdminClient: mockCreateClient,
+        asDb: jest.fn((c: any) => c),
+        }))
 
       jest.mock('next/server', () => ({
         NextRequest: class NextRequest {
@@ -266,8 +300,13 @@ describe('WhatsApp Webhook Handler', () => {
             this.url = url
             this.init = init
           }
-          async json() { return this.init.body }
-          headers = { get: () => null }
+          async text() { return this.init.body }
+          headers = { get: (name: string) => {
+            if (name === 'x-hub-signature-256' && this.init.headers) {
+              return (this.init.headers as Record<string, string>)['x-hub-signature-256']
+            }
+            return null
+          }}
         },
         NextResponse: {
           json: (body: any, init?: { status?: number }) => ({
@@ -306,9 +345,13 @@ describe('WhatsApp Webhook Handler', () => {
         ],
       }
 
+      const bodyStr3 = JSON.stringify(body)
       const request = new NextRequest('http://localhost/api/webhooks/whatsapp', {
         method: 'POST',
-        body: JSON.stringify(body),
+        body: bodyStr3,
+        headers: {
+          'x-hub-signature-256': createValidSignature(bodyStr3),
+        },
       })
 
       const response = await POST(request as any)
@@ -324,16 +367,33 @@ describe('WhatsApp Webhook Handler', () => {
     it('should mark reminder as responded on incoming message', async () => {
       const mockUpdate = jest.fn().mockResolvedValue({ data: null, error: null })
       const mockEq = jest.fn().mockResolvedValue({ data: null, error: null })
+      const mockEq2 = jest.fn().mockResolvedValue({ data: null, error: null })
+      mockEq.mockReturnValue({ eq: mockEq2 })
       mockUpdate.mockReturnValue({ eq: mockEq })
 
+      const mockSingle = jest.fn()
+        .mockResolvedValueOnce({ data: null, error: new Error('Not found') })
+        .mockResolvedValueOnce({
+          data: { id: 'reminder-1', invoice_id: 'inv-1' },
+          error: null,
+        })
+        .mockResolvedValueOnce({
+          data: { user_id: 'user-1', client_id: 'client-1' },
+          error: null,
+        })
+      const mockEqChain = jest.fn().mockReturnValue({ single: mockSingle })
+      const mockOr = jest.fn().mockReturnValue({ single: mockSingle })
+      const mockSelect = jest.fn().mockReturnValue({ eq: mockEqChain, or: mockOr, single: mockSingle })
       const mockFrom = jest.fn().mockReturnValue({
         update: mockUpdate,
+        select: mockSelect,
       })
       const mockCreateClient = jest.fn().mockReturnValue({ from: mockFrom })
 
-      jest.mock('@/lib/supabase/server', () => ({
-        createClient: mockCreateClient,
-      }))
+      jest.mock('@/lib/supabase/admin', () => ({
+        createAdminClient: mockCreateClient,
+        asDb: jest.fn((c: any) => c),
+        }))
 
       jest.mock('next/server', () => ({
         NextRequest: class NextRequest {
@@ -343,8 +403,13 @@ describe('WhatsApp Webhook Handler', () => {
             this.url = url
             this.init = init
           }
-          async json() { return this.init.body }
-          headers = { get: () => null }
+          async text() { return this.init.body }
+          headers = { get: (name: string) => {
+            if (name === 'x-hub-signature-256' && this.init.headers) {
+              return (this.init.headers as Record<string, string>)['x-hub-signature-256']
+            }
+            return null
+          }}
         },
         NextResponse: {
           json: (body: any, init?: { status?: number }) => ({
@@ -381,9 +446,13 @@ describe('WhatsApp Webhook Handler', () => {
         ],
       }
 
+      const bodyStr4 = JSON.stringify(body)
       const request = new NextRequest('http://localhost/api/webhooks/whatsapp', {
         method: 'POST',
-        body: JSON.stringify(body),
+        body: bodyStr4,
+        headers: {
+          'x-hub-signature-256': createValidSignature(bodyStr4),
+        },
       })
 
       const response = await POST(request as any)
@@ -391,15 +460,25 @@ describe('WhatsApp Webhook Handler', () => {
 
       const expectedRespondedAt = new Date(timestamp * 1000).toISOString()
 
+      expect(mockFrom).toHaveBeenCalledWith('users')
       expect(mockFrom).toHaveBeenCalledWith('reminders')
+      expect(mockFrom).toHaveBeenCalledWith('invoices')
+      expect(mockFrom).toHaveBeenCalledWith('clients')
       expect(mockUpdate).toHaveBeenCalledWith({
         responded_at: expectedRespondedAt,
         status: 'responded',
       })
-      expect(mockEq).toHaveBeenCalledWith('whatsapp_message_id', 'wamid_test123')
+      expect(mockEqChain).toHaveBeenCalledWith('whatsapp_message_id', 'wamid_test123')
     })
 
     it('should return ignored when entry is missing', async () => {
+      const mockCreateAdminClient = jest.fn().mockReturnValue({ from: jest.fn() })
+
+      jest.mock('@/lib/supabase/admin', () => ({
+        createAdminClient: mockCreateAdminClient,
+        asDb: jest.fn((c: any) => c),
+        }))
+
       jest.mock('next/server', () => ({
         NextRequest: class NextRequest {
           url: string
@@ -408,8 +487,13 @@ describe('WhatsApp Webhook Handler', () => {
             this.url = url
             this.init = init
           }
-          async json() { return this.init.body }
-          headers = { get: () => null }
+          async text() { return this.init.body }
+          headers = { get: (name: string) => {
+            if (name === 'x-hub-signature-256' && this.init.headers) {
+              return (this.init.headers as Record<string, string>)['x-hub-signature-256']
+            }
+            return null
+          }}
         },
         NextResponse: {
           json: (body: any, init?: { status?: number }) => ({
@@ -421,9 +505,13 @@ describe('WhatsApp Webhook Handler', () => {
 
       const { POST } = await import('@/app/api/webhooks/whatsapp/route')
 
+      const ignoredBody = JSON.stringify({ entry: [] })
       const request = new NextRequest('http://localhost/api/webhooks/whatsapp', {
         method: 'POST',
-        body: JSON.stringify({}),
+        body: ignoredBody,
+        headers: {
+          'x-hub-signature-256': createValidSignature(ignoredBody),
+        },
       })
 
       const response = await POST(request as any)

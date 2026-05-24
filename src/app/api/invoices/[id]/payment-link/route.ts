@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { apiError } from '@/lib/api-helpers'
 import { createPaymentLink } from '@/lib/razorpay'
+import { withRateLimit } from '@/lib/rate-limit-middleware'
 
 interface InvoiceWithClient {
   id: string
@@ -14,11 +16,14 @@ export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const rateLimitResponse = await withRateLimit(request, 'payment-link', 10, 60)
+  if (rateLimitResponse) return rateLimitResponse
+
   const supabase = createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    return apiError('Unauthorized', 401)
   }
 
   const { data: invoice, error: invoiceError } = await supabase
@@ -29,7 +34,7 @@ export async function POST(
     .single()
 
   if (invoiceError || !invoice) {
-    return NextResponse.json({ error: 'Invoice not found' }, { status: 404 })
+    return apiError('Invoice not found', 404)
   }
 
   const typedInvoice = invoice as unknown as InvoiceWithClient
@@ -51,17 +56,19 @@ export async function POST(
       },
     })
 
-    await supabase
+    const { error: updateError } = await supabase
       .from('invoices')
       .update({ upi_link: link.short_url })
       .eq('id', typedInvoice.id)
 
+    if (updateError) {
+      console.error('Failed to update invoice with payment link:', updateError)
+      // Don't fail the response — the payment link was created
+    }
+
     return NextResponse.json({ url: link.short_url, id: link.id })
   } catch (error) {
     console.error('Failed to create payment link:', error)
-    return NextResponse.json(
-      { error: 'Failed to create payment link' },
-      { status: 500 }
-    )
+    return apiError('Failed to create payment link', 500)
   }
 }

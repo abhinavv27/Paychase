@@ -23,9 +23,7 @@ export function generateWhatsAppBusinessLink(params: {
   message: string
   businessPhone: string
 }): string {
-  // For WhatsApp Business API click-to-chat links
-  // Uses the business's phone number as the sender
-  return generateWhatsAppLink({ phone: params.phone, message: params.message })
+  return generateWhatsAppLink({ phone: params.businessPhone, message: params.message })
 }
 
 export function copyToClipboard(message: string): void {

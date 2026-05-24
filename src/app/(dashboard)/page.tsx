@@ -1,6 +1,8 @@
 import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
 import { ActionBanner } from '@/components/dashboard/action-banner'
+import { HealthScore } from '@/components/dashboard/health-score'
+import { calculateCollectionHealth } from '@/lib/ai/collection-health'
 
 export const metadata: Metadata = {
   title: 'Dashboard',
@@ -26,6 +28,21 @@ function timeAgo(date: string): string {
   return then.toLocaleDateString()
 }
 
+function calculateDSO(invoices: { issue_date: string; payment_date: string | null; status: string }[]): number {
+  const paid = invoices.filter((i) => i.status === 'paid' && i.payment_date)
+  if (paid.length === 0) return 0
+
+  let totalDays = 0
+  for (const inv of paid) {
+    const issueDate = new Date(inv.issue_date)
+    const paymentDate = new Date(inv.payment_date!)
+    const days = Math.floor((paymentDate.getTime() - issueDate.getTime()) / (1000 * 60 * 60 * 24))
+    if (days >= 0) totalDays += days
+  }
+
+  return Math.round(totalDays / paid.length)
+}
+
 export default async function OverviewPage() {
   const supabase = createClient()
   const {
@@ -44,6 +61,8 @@ export default async function OverviewPage() {
     paymentsResult,
     recentRemindersResult,
     overdueClientsResult,
+    approvalRateResult,
+    allClientsResult,
   ] = await Promise.all([
     supabase
       .from('reminders')
@@ -52,7 +71,7 @@ export default async function OverviewPage() {
       .eq('approval_status', 'draft'),
     supabase
       .from('invoices')
-      .select('amount, status')
+      .select('amount, status, issue_date, payment_date')
       .eq('user_id', user!.id),
     supabase
       .from('invoices')
@@ -84,6 +103,16 @@ export default async function OverviewPage() {
       .gt('total_outstanding', 0)
       .order('total_outstanding', { ascending: false })
       .limit(3),
+    supabase
+      .from('reminders')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user!.id)
+      .eq('approval_status', 'approved'),
+    supabase
+      .from('clients')
+      .select('total_outstanding, risk_score')
+      .eq('user_id', user!.id)
+      .gt('total_outstanding', 0),
   ])
 
   const draftCount = draftCountResult.count ?? 0
@@ -98,6 +127,29 @@ export default async function OverviewPage() {
 
   const recentActivity = recentRemindersResult.data ?? []
   const topOverdueClients = overdueClientsResult.data ?? []
+
+  const allInvoices = (invoicesResult.data ?? []) as { amount: number; status: string; issue_date: string; payment_date: string | null }[]
+  const paidCount = allInvoices.filter((i) => i.status === 'paid').length
+  const recoveryRate = allInvoices.length > 0 ? Math.round((paidCount / allInvoices.length) * 100) : 0
+  const dso = calculateDSO(allInvoices)
+
+  const approvedCount = approvalRateResult.count ?? 0
+  const totalReminders = (draftCountResult.count ?? 0) + (sentThisWeekResult.count ?? 0) + approvedCount
+  const approvalRate = totalReminders > 0 ? Math.round((approvedCount / totalReminders) * 100) : 0
+
+  const allClients = (allClientsResult.data ?? []) as { total_outstanding: number; risk_score: number }[]
+  const highRiskOutstanding = allClients
+    .filter((c) => (c.risk_score ?? 0) >= 70)
+    .reduce((sum, c) => sum + (c.total_outstanding ?? 0), 0)
+
+  const healthScore = calculateCollectionHealth({
+    dso,
+    recoveryRate,
+    highRiskOutstanding,
+    totalOutstanding,
+    approvalRate,
+    collectionVelocity: dso,
+  })
 
   return (
     <div className="space-y-8">
@@ -147,6 +199,11 @@ export default async function OverviewPage() {
           </p>
           <p className="mt-1 text-sm text-gray-500">Payments received</p>
         </div>
+      </div>
+
+      {/* Collection Health */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <HealthScore score={healthScore.score} level={healthScore.level} />
       </div>
 
       {/* Recent Activity */}
