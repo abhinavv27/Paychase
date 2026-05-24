@@ -4,6 +4,7 @@ import { redirect } from "next/navigation"
 import Link from "next/link"
 import { ArrowLeft, Clock } from "lucide-react"
 import { ApproveButton, DismissButton } from "@/components/approvals/draft-actions"
+import { DeliveryStatus } from "@/components/approvals/delivery-status"
 
 export const metadata: Metadata = {
   title: "Approvals",
@@ -75,6 +76,10 @@ export default async function ApprovalsPage() {
                   })}
                 </div>
               )}
+              <DeliveryStatus
+                draftId={draft.id}
+                initialStatus={draft.status as 'draft' | 'sent' | 'delivered' | 'responded'}
+              />
               <div className="mt-3 flex gap-2">
                 <ApproveButton draftId={draft.id} />
                 <DismissButton draftId={draft.id} />
