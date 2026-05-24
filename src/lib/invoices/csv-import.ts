@@ -13,7 +13,6 @@ export interface CsvRow {
 export interface ImportResult {
   imported: number
   errors: { row: number; message: string }[]
-  skipped: number
 }
 
 export async function parseCsvContent(content: string): Promise<{ rows: CsvRow[]; errors: ImportResult['errors'] }> {
@@ -30,8 +29,12 @@ export async function parseCsvContent(content: string): Promise<{ rows: CsvRow[]
           const row = results.data[i] as Record<string, unknown>
           const rowNum = i + 2
 
-          if (!row.client_name || !row.amount) {
-            errors.push({ row: rowNum, message: 'Missing required fields: client_name, amount' })
+          if (!row.client_name) {
+            errors.push({ row: rowNum, message: 'Missing required field: client_name' })
+            continue
+          }
+          if (!row.amount) {
+            errors.push({ row: rowNum, message: 'Missing required field: amount' })
             continue
           }
 
@@ -67,7 +70,7 @@ export async function parseCsvContent(content: string): Promise<{ rows: CsvRow[]
 
 export async function importCsvRows(rows: CsvRow[], userId: string): Promise<ImportResult> {
   const supabase = createClient()
-  const result: ImportResult = { imported: 0, errors: [], skipped: 0 }
+  const result: ImportResult = { imported: 0, errors: [] }
 
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i]

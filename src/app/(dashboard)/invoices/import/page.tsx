@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { ImportResultView } from '@/components/invoices/import-result'
 
 export default function ImportInvoicesPage() {
-  const [result, setResult] = useState<{ imported: number; errors: { row: number; message: string }[]; skipped: number } | null>(null)
+  const [result, setResult] = useState<{ imported: number; errors: { row: number; message: string }[] } | null>(null)
   const [loading, setLoading] = useState(false)
 
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -22,7 +22,7 @@ export default function ImportInvoicesPage() {
       const data = await res.json()
       setResult(data)
     } catch {
-      setResult({ imported: 0, errors: [{ row: 0, message: 'Network error' }], skipped: 0 })
+      setResult({ imported: 0, errors: [{ row: 0, message: 'Network error' }] })
     } finally {
       setLoading(false)
     }
