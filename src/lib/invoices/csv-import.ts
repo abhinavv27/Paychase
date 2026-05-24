@@ -20,7 +20,7 @@ export async function parseCsvContent(content: string): Promise<{ rows: CsvRow[]
     Papa.parse(content, {
       header: true,
       skipEmptyLines: true,
-      dynamicTyping: true,
+      dynamicTyping: false,
       complete: (results) => {
         const errors: ImportResult['errors'] = []
         const rows: CsvRow[] = []
