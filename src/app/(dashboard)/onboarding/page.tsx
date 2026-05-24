@@ -16,7 +16,6 @@ export default function OnboardingPage() {
   const [step, setStep] = useState(1)
   const [company, setCompany] = useState('')
   const [style, setStyle] = useState('professional')
-  const [clientAdded, setClientAdded] = useState(false)
   const [state, formAction] = useFormState(
     completeOnboarding as (state: { error?: string }, payload: FormData) => Promise<{ error?: string }>,
     {}
@@ -174,7 +173,7 @@ export default function OnboardingPage() {
                 </div>
               </div>
               <QuickAddClient
-                onClientAdded={(client) => setClientAdded(true)}
+                onClientAdded={() => {}}
               />
             </div>
           )}
