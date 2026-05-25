@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import toast from 'react-hot-toast'
 
 interface QuickAddClientProps {
   onClientAdded: (client: { id: string; name: string }) => void
@@ -28,11 +29,14 @@ export function QuickAddClient({ onClientAdded }: QuickAddClientProps) {
         body: JSON.stringify({ name: name.trim(), phone: phone.trim(), email: email.trim() }),
       })
       const data = await res.json()
-      if (data.error) { setError(data.error); return }
+      if (data.error) { setError(data.error); toast.error(data.error); return }
       setAdded(true)
+      toast.success(`${name.trim()} added successfully`)
       onClientAdded(data.client)
     } catch {
-      setError('Failed to add client. Please try again.')
+      const msg = 'Failed to add client. Please try again.'
+      setError(msg)
+      toast.error(msg)
     } finally {
       setLoading(false)
     }

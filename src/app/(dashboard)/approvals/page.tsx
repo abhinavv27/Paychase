@@ -2,11 +2,12 @@
 import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import Link from "next/link"
-import { ArrowLeft, Clock } from "lucide-react"
+import { ArrowLeft, Clock, Inbox } from "lucide-react"
 
 export const revalidate = 300
 import { ApproveButton, DismissButton } from "@/components/approvals/draft-actions"
 import { DeliveryStatus } from "@/components/approvals/delivery-status"
+import { EmptyState } from "@/components/ui/empty-state"
 
 export const metadata: Metadata = {
   title: "Approvals",
@@ -38,10 +39,7 @@ export default async function ApprovalsPage() {
       </div>
 
       {!drafts?.length ? (
-        <div className="text-center py-16 text-gray-400">
-          <p className="text-lg">No pending drafts</p>
-          <p className="text-sm mt-1">New drafts will appear here when AI generates them.</p>
-        </div>
+        <EmptyState icon={Inbox} title="No pending drafts" description="New drafts will appear here when AI generates them." />
       ) : (
         <div className="space-y-4">
           {drafts.map((draft) => (
