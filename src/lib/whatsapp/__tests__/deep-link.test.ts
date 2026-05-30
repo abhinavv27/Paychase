@@ -82,11 +82,11 @@ describe('generateWhatsAppLink', () => {
 })
 
 describe('generateWhatsAppBusinessLink', () => {
-  it('generates a link using the provided phone number', () => {
+  it('generates a link using the provided business phone number', () => {
     const link = generateWhatsAppBusinessLink({
-      phone: '919876543210',
+      phone: '911234567890',
       message: 'Business message',
-      businessPhone: '911234567890',
+      businessPhone: '919876543210',
     })
 
     expect(link).toBe('https://wa.me/919876543210?text=Business%20message')

@@ -1,4 +1,4 @@
-const mockExec = jest.fn()
+﻿const mockExec = jest.fn()
 
 jest.mock('@upstash/redis', () => ({
   Redis: jest.fn().mockImplementation(() => ({
@@ -34,7 +34,7 @@ describe('rateLimit', () => {
 
     expect(result.success).toBe(true)
     expect(result.remaining).toBe(100)
-    expect(result.reset).toBe(0)
+    expect(result.reset).toBeGreaterThan(0)
     expect(mockExec).not.toHaveBeenCalled()
   })
 

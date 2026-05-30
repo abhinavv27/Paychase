@@ -5,12 +5,15 @@ type InvoiceInsert = Database['public']['Tables']['invoices']['Insert']
 type InvoiceUpdate = Database['public']['Tables']['invoices']['Update']
 type InvoiceRow = Database['public']['Tables']['invoices']['Row']
 
+const PAGE_SIZE = 200
+
 export async function getInvoices(): Promise<(InvoiceRow & { client: { name: string } })[]> {
   const supabase = createClient()
   const { data, error } = await supabase
     .from('invoices')
     .select('*, client:clients(name)')
     .order('created_at', { ascending: false })
+    .limit(PAGE_SIZE)
   if (error) throw error
   return data
 }
@@ -65,6 +68,7 @@ export async function getInvoicesByStatus(status: string): Promise<InvoiceRow[]>
     .select('*')
     .eq('status', status)
     .order('due_date', { ascending: true })
+    .limit(PAGE_SIZE)
   if (error) throw error
   return data
 }
@@ -78,6 +82,7 @@ export async function getOverdueInvoices(): Promise<InvoiceRow[]> {
     .eq('status', 'pending')
     .lt('due_date', today)
     .order('due_date', { ascending: true })
+    .limit(PAGE_SIZE)
   if (error) throw error
   return data
 }

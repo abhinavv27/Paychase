@@ -73,18 +73,23 @@ describe('Razorpay Webhook Handler', () => {
   })
 
   it('should record payment and update invoice on valid signature', async () => {
-    const mockUpdate = jest.fn().mockResolvedValue({ data: null, error: null })
-    const mockEq = jest.fn().mockResolvedValue({ data: null, error: null })
-    mockUpdate.mockReturnValue({ eq: mockEq })
+    const mockSingle = jest.fn().mockResolvedValue({ data: null, error: null })
+    const mockSelectEq = jest.fn().mockReturnValue({ single: mockSingle })
+    const mockSelect = jest.fn().mockReturnValue({ eq: mockSelectEq })
+    const mockNeq = jest.fn().mockResolvedValue({ data: null, error: null })
+    const mockEq = jest.fn().mockReturnValue({ neq: mockNeq })
+    const mockUpdate = jest.fn().mockReturnValue({ eq: mockEq })
     const mockInsert = jest.fn().mockResolvedValue({ data: null, error: null })
     const mockFrom = jest.fn().mockReturnValue({
       insert: mockInsert,
       update: mockUpdate,
+      select: mockSelect,
     })
     const mockCreateClient = jest.fn().mockReturnValue({ from: mockFrom })
 
-    jest.mock('@/lib/supabase/server', () => ({
-      createClient: mockCreateClient,
+    jest.mock('@/lib/supabase/admin', () => ({
+      createAdminClient: mockCreateClient,
+      asDb: jest.fn((c: any) => c),
     }))
 
     jest.mock('next/server', () => ({
@@ -173,17 +178,22 @@ describe('Razorpay Webhook Handler', () => {
   })
 
   it('should return duplicate status on unique constraint violation', async () => {
+    const mockSingle = jest.fn().mockResolvedValue({ data: null, error: null })
+    const mockSelectEq = jest.fn().mockReturnValue({ single: mockSingle })
+    const mockSelect = jest.fn().mockReturnValue({ eq: mockSelectEq })
     const mockInsert = jest.fn().mockResolvedValue({
       data: null,
       error: { code: '23505', message: 'duplicate key value violates unique constraint' },
     })
     const mockFrom = jest.fn().mockReturnValue({
       insert: mockInsert,
+      select: mockSelect,
     })
     const mockCreateClient = jest.fn().mockReturnValue({ from: mockFrom })
 
-    jest.mock('@/lib/supabase/server', () => ({
-      createClient: mockCreateClient,
+    jest.mock('@/lib/supabase/admin', () => ({
+      createAdminClient: mockCreateClient,
+      asDb: jest.fn((c: any) => c),
     }))
 
     jest.mock('next/server', () => ({
@@ -244,8 +254,9 @@ describe('Razorpay Webhook Handler', () => {
   })
 
   it('should ignore non-payment.captured events', async () => {
-    jest.mock('@/lib/supabase/server', () => ({
-      createClient: jest.fn(),
+    jest.mock('@/lib/supabase/admin', () => ({
+      createAdminClient: jest.fn(),
+      asDb: jest.fn((c: any) => c),
     }))
 
     jest.mock('next/server', () => ({

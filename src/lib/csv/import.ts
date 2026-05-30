@@ -40,7 +40,7 @@ export function validateCsvContent(content: string, userId: string): ValidationR
       skip_empty_lines: true,
       trim: true,
     })
-  } catch (e) {
+  } catch {
     return {
       valid: false,
       clients: [],

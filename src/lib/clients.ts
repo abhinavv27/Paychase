@@ -5,12 +5,15 @@ type ClientInsert = Database['public']['Tables']['clients']['Insert']
 type ClientUpdate = Database['public']['Tables']['clients']['Update']
 type ClientRow = Database['public']['Tables']['clients']['Row']
 
+const PAGE_SIZE = 200
+
 export async function getClients(): Promise<ClientRow[]> {
   const supabase = createClient()
   const { data, error } = await supabase
     .from('clients')
     .select('*')
     .order('created_at', { ascending: false })
+    .limit(PAGE_SIZE)
   if (error) throw error
   return data
 }

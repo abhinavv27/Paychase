@@ -1,4 +1,4 @@
-const WHATSAPP_API_BASE = 'https://graph.facebook.com/v18.0'
+export const WHATSAPP_API_BASE = 'https://graph.facebook.com/v18.0'
 
 export async function sendWhatsAppMessage(params: {
   phoneNumberId: string
@@ -37,6 +37,39 @@ export async function sendWhatsAppMessage(params: {
           language: { code: language },
           components,
         },
+      }),
+    }
+  )
+
+  if (!response.ok) {
+    const error = await response.json()
+    throw new Error(`WhatsApp API error: ${error.error?.message || response.statusText}`)
+  }
+
+  return response.json()
+}
+
+export async function sendTextMessage(to: string, text: string) {
+  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID
+  const accessToken = process.env.WHATSAPP_ACCESS_TOKEN
+
+  if (!phoneNumberId || !accessToken) {
+    throw new Error('WhatsApp credentials not configured')
+  }
+
+  const response = await fetch(
+    `${WHATSAPP_API_BASE}/${phoneNumberId}/messages`,
+    {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        messaging_product: 'whatsapp',
+        to,
+        type: 'text',
+        text: { body: text },
       }),
     }
   )

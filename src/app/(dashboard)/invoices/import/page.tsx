@@ -18,8 +18,8 @@ interface ValidationWarning {
 
 interface ValidationResult {
   valid: boolean
-  clients: any[]
-  invoices: any[]
+  clients: Array<Record<string, unknown>>
+  invoices: Array<Record<string, unknown>>
   errors: ValidationError[]
   warnings: ValidationWarning[]
 }
@@ -111,7 +111,7 @@ export default function ImportCsvPage() {
       } else {
         setValidation(data)
       }
-    } catch (err) {
+    } catch {
       setError('Failed to validate CSV. Please try again.')
     } finally {
       setIsValidating(false)
@@ -139,7 +139,7 @@ export default function ImportCsvPage() {
         router.push('/invoices')
         router.refresh()
       }
-    } catch (err) {
+    } catch {
       setError('Failed to import CSV. Please try again.')
     } finally {
       setIsImporting(false)

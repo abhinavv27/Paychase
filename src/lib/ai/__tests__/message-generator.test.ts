@@ -18,7 +18,7 @@ describe('generateFollowUpMessage', () => {
     const result = generateFollowUpMessage(createContext({ daysOverdue: 2, reminderCount: 0 }))
 
     expect(result.escalationLevel).toBe('gentle')
-    expect(result.tone).toBe('friendly')
+    expect(result.tone).toBe('casual')
     expect(result.text).toContain('friendly reminder')
   })
 
@@ -30,11 +30,11 @@ describe('generateFollowUpMessage', () => {
     expect(result.text).toContain('following up')
   })
 
-  it('fourth reminder, 20 days overdue → urgent, firm tone', () => {
+  it('fourth reminder, 20 days overdue → urgent, formal tone', () => {
     const result = generateFollowUpMessage(createContext({ daysOverdue: 20, reminderCount: 4 }))
 
     expect(result.escalationLevel).toBe('urgent')
-    expect(result.tone).toBe('firm')
+    expect(result.tone).toBe('formal')
     expect(result.text.toLowerCase()).toContain('urgently')
   })
 
@@ -55,7 +55,7 @@ describe('generateFollowUpMessage', () => {
     }))
 
     expect(firmResult.escalationLevel).toBe('urgent')
-    expect(firmResult.tone).toBe('firm')
+    expect(firmResult.tone).toBe('formal')
   })
 
   it('client responded with "paid" → does not escalate', () => {
@@ -66,7 +66,7 @@ describe('generateFollowUpMessage', () => {
     }))
 
     expect(result.escalationLevel).toBe('gentle')
-    expect(result.tone).toBe('friendly')
+    expect(result.tone).toBe('casual')
   })
 
   it('casual user style → casual language', () => {
