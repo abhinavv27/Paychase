@@ -322,7 +322,3 @@ PayChase AI is designed to comply with India's Digital Personal Data Protection 
 
 MIT -- see [LICENSE](LICENSE) for details.
 
-## Contact
-
-- **Website:** [paychase.ai](https://paychase.ai) (coming soon)
-- **Email:** hello@paychase.ai
