@@ -1,74 +1,36 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { withRateLimit } from '@/lib/rate-limit-middleware'
 import { createClient } from '@/lib/supabase/server'
-import { apiError } from '@/lib/api-helpers'
-import { validateCsvContent } from '@/lib/csv/import'
+import { parseCsvContent, importCsvRows } from '@/lib/invoices/csv-import'
+import { revalidatePath } from 'next/cache'
 
 export async function POST(request: NextRequest) {
-  const rateLimitResponse = await withRateLimit(request, 'csv-import', 10, 3600)
-  if (rateLimitResponse) return rateLimitResponse
-
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
-    return apiError('Unauthorized', 401)
-  }
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const body = await request.json()
-  const { content } = body
+  try {
+    const formData = await request.formData()
+    const file = formData.get('file') as File | null
+    if (!file) return NextResponse.json({ error: 'No file uploaded' }, { status: 400 })
 
-  if (!content) {
-    return apiError('No CSV content', 400)
-  }
+    const content = await file.text()
+    const { rows, errors: parseErrors } = await parseCsvContent(content)
 
-  const validation = validateCsvContent(content, user.id)
-
-  if (!validation.valid) {
-    return NextResponse.json({ errors: validation.errors }, { status: 400 })
-  }
-
-  // Import clients first
-  if (validation.clients.length > 0) {
-    const { error: clientError } = await supabase
-      .from('clients')
-      .insert(validation.clients)
-    if (clientError) {
-      return apiError(clientError.message, 500)
+    if (rows.length === 0) {
+      return NextResponse.json({ imported: 0, errors: parseErrors })
     }
-  }
 
-  // Fetch created clients to map names to IDs
-  const { data: createdClients } = await supabase
-    .from('clients')
-    .select('id, name')
-    .eq('user_id', user.id)
-
-  const clientNameToId = new Map(
-    createdClients?.map((c) => [c.name.toLowerCase(), c.id]) || []
-  )
-
-  // Link invoices to clients
-  const invoicesWithClientIds = validation.invoices.map((inv) => {
-    const { _clientName, ...invoiceData } = inv
-    return {
-      ...invoiceData,
-      client_id: clientNameToId.get(_clientName.toLowerCase()) || '',
+    if (rows.length > 500) {
+      return NextResponse.json({ error: 'Maximum 500 rows per import' }, { status: 400 })
     }
-  })
 
-  // Import invoices
-  if (invoicesWithClientIds.length > 0) {
-    const { error: invoiceError } = await supabase
-      .from('invoices')
-      .insert(invoicesWithClientIds)
-    if (invoiceError) {
-      return apiError(invoiceError.message, 500)
-    }
+    const result = await importCsvRows(rows, user.id)
+    result.errors = [...parseErrors, ...result.errors]
+
+    revalidatePath('/invoices')
+    revalidatePath('/clients')
+    return NextResponse.json(result)
+  } catch (err) {
+    return NextResponse.json({ error: err instanceof Error ? err.message : 'Import failed' }, { status: 500 })
   }
-
-  return NextResponse.json({
-    clients: validation.clients.length,
-    invoices: validation.invoices.length,
-    warnings: validation.warnings,
-  })
 }
