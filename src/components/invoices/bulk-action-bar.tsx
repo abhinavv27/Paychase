@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { CheckSquare, Send, DollarSign } from 'lucide-react'
+import toast from 'react-hot-toast'
 
 interface BulkActionBarProps {
   selectedCount: number
@@ -16,8 +17,16 @@ export function BulkActionBar({ selectedCount, onMarkPaid, onGenerateDrafts, onC
 
   const handleAction = async (fn: () => Promise<void>, label: string) => {
     setAction(label)
+    const toastId = toast.loading(`Processing ${label}...`)
     startTransition(async () => {
-      await fn()
+      try {
+        await fn()
+        toast.dismiss(toastId)
+        toast.success(`${label.charAt(0).toUpperCase() + label.slice(1)} completed successfully`)
+      } catch {
+        toast.dismiss(toastId)
+        toast.error(`Failed to complete ${label}`)
+      }
       setAction('')
     })
   }

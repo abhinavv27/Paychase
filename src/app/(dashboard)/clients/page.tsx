@@ -2,7 +2,9 @@ import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
 import { Suspense } from 'react'
 import Link from 'next/link'
+import { Users } from 'lucide-react'
 import { RiskCards } from '@/components/clients/risk-cards'
+import { EmptyState } from '@/components/ui/empty-state'
 
 export const revalidate = 300
 
@@ -22,17 +24,7 @@ async function ClientList() {
     .order('created_at', { ascending: false })
 
   if (!clients || clients.length === 0) {
-    return (
-      <div className="text-center py-12">
-        <p className="text-gray-500 dark:text-gray-400">No clients yet.</p>
-        <Link
-          href="/clients/add"
-          className="mt-4 inline-flex items-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500"
-        >
-          Add your first client
-        </Link>
-      </div>
-    )
+    return <EmptyState icon={Users} title="No clients yet" description="Add your first client to get started with payment follow-ups." actionLabel="Add your first client" actionHref="/clients/add" />
   }
 
   return <RiskCards clients={clients} />

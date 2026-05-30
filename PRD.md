@@ -1,8 +1,8 @@
 # PayChase AI — Product Requirements Document (PRD)
 
-**Version:** 2.0  
-**Date:** 2026-05-21  
-**Status:** Draft  
+**Version:** 3.0  
+**Date:** 2026-05-24  
+**Status:** Active  
 **Author:** opencode (AI-assisted)
 
 ---
@@ -87,6 +87,7 @@ The core problem is not just time — it's the emotional friction of asking for 
 | CLI-6 | CSV Import | P1 | Upload CSV with pre-flight validation, partial import, error report |
 | CLI-7 | Consent Tracking | P0 | DPDP-compliant consent checkbox on client creation, logged in consent_log table |
 | CLI-8 | Response History | P0 | Track client responses (replied/promised/silent/disputed) per follow-up |
+| CLI-9 | Client Activity Log | P2 | Reverse-chronological timeline of payment + communication events per client with icons |
 
 ### 5.3 Invoice Management
 
@@ -124,6 +125,7 @@ The core problem is not just time — it's the emotional friction of asking for 
 | MSG-6 | Delivery Tracking | P1 | Manual status logging: sent, delivered, replied (user marks after sending) |
 | MSG-7 | Fallback Logic | P1 | No WhatsApp number → email draft fallback |
 | MSG-8 | Message Approval Workflow | P0 | Core workflow: cron generates drafts → user sees in dashboard → reviews/edits → approves → wa.me link opens → user sends |
+| MSG-9 | Custom Message Templates | P2 | User-customizable message text with variable insertion per language and escalation level |
 
 ### 5.6 Payments
 
@@ -132,8 +134,9 @@ The core problem is not just time — it's the emotional friction of asking for 
 | PAY-1 | Razorpay Integration | P0 | Create payment links, embed in message drafts |
 | PAY-2 | Webhook Handler | P0 | Idempotent payment capture via UNIQUE constraint on razorpay_payment_id |
 | PAY-3 | Payment Recording | P0 | Auto-record payment, mark invoice paid, update AI model |
-| PAY-4 | Payment Reconciliation | P1 | Cron job every 30 min to catch missed webhooks |
-| PAY-5 | Partial Payments | P2 | Support partial payment against invoice amount |
+| PAY-4 | Payment Reconciliation | P1 | Cron job every 30 min to catch missed webhooks + manual matching UI |
+| PAY-5 | Payment Transactions Table | P2 | Track matched/unmatched Razorpay payments with manual invoice assignment |
+| PAY-6 | Partial Payments | P2 | Support partial payment against invoice amount |
 
 ### 5.7 Dashboard
 
@@ -146,6 +149,8 @@ The core problem is not just time — it's the emotional friction of asking for 
 | DASH-5 | AI Insights Page | P0 | Late payment predictions, optimal collection day, at-risk amounts |
 | DASH-6 | Recovery Analytics | P1 | DSO trends, recovery rates, approval rate trends |
 | DASH-7 | ISR Caching | P1 | 5-min revalidate, tag-based invalidation on data changes |
+| DASH-8 | UI Primitives | P2 | Reusable EmptyState, Skeleton/TableSkeleton/CardSkeleton components across all pages |
+| DASH-9 | Toast Notifications | P2 | Feedback toasts on all mutation actions (mark paid, approve, delete, add client) |
 
 ### 5.8 Compliance & Security
 
@@ -157,6 +162,8 @@ The core problem is not just time — it's the emotional friction of asking for 
 | SEC-4 | Data Export | P1 | Export client/invoice/draft data as JSON/CSV |
 | SEC-5 | Rate Limiting | P1 | 100 req/min per user via Upstash Redis |
 | SEC-6 | Data Retention | P2 | Delete consent logs after 3 years |
+| SEC-7 | Sentry Error Monitoring | P2 | Global error boundary capturing exceptions to Sentry |
+| ORG-1 | Organization Schema | P2 | Multi-tenant database schema (organizations, organization_members) with RLS — full team mode deferred |
 
 ---
 
@@ -193,14 +200,17 @@ The core problem is not just time — it's the emotional friction of asking for 
 | AI | Template-based v1 → LLM v2 | Deterministic, debuggable, sufficient for v1 |
 | Payments | Razorpay | UPI links, webhooks, 2% per transaction |
 | Hosting | Vercel | Free tier: 100GB bandwidth, serverless, cron |
-| Rate Limiting | Upstash Redis | 10K requests/day free |
+| Rate Limiting | Upstash Redis + @upstash/ratelimit | 10K requests/day free |
+| Error Tracking | Sentry | Free tier: 5K events/month |
+| CSV Parsing | papaparse | Client-side CSV parsing with validation |
+| Toast Notifications | react-hot-toast | Lightweight, dark-themed toast provider |
 
 ### 7.2 Cron Jobs
 
 | Job | Schedule | Pagination | Purpose |
 |-----|----------|------------|---------|
-| AI Draft Generation | Daily 6 AM IST | 100 invoices/batch | Generate message drafts for overdue invoices |
-| Payment Reconciliation | Every 30 min | N/A | Catch missed webhooks |
+| AI Draft Generation | Daily 6 AM IST | 100 invoices/batch | Generate message drafts for overdue invoices — checks custom templates, falls back to email |
+| Payment Reconciliation | Every 30 min | N/A | Catch missed webhooks + tries to auto-match unmatched transactions |
 | Consent Cleanup | Monthly 1st 3 AM | 100 records/batch | Delete old consent logs |
 
 ### 7.3 Data Flow
@@ -210,12 +220,18 @@ User signs up → Supabase Auth → RLS isolates data
 User sets style preference → casual/professional/formal stored
 User uploads invoices → CSV validated → Clients created/updated
 Vercel Cron (6 AM) → AI generates drafts → Stores in message_drafts table
+  - Checks custom_templates for user's override; falls back to built-in translations
+  - Supports 5 languages: en, hi, ta, te, bn
+  - Falls back to email (Resend) if client has no WhatsApp number
 Dashboard shows pending drafts → User reviews, edits if needed, approves
 Approved draft → wa.me link generated → Opens WhatsApp with pre-filled message
 User hits send in WhatsApp → Message sent from user's own number
-User marks as sent in dashboard → Status updated, response tracking begins
-Client pays via UPI → Razorpay webhook (idempotent) → Invoice marked paid
+User marks as sent/delivered/replied → Delivery status tracked per draft
+Client paid via UPI → Razorpay webhook (idempotent) → Transaction matched or queued
+  - Auto-matched: invoice → paid, transaction → matched
+  - Unmatched: appears in reconciliation dashboard for manual assignment
 Dashboard refreshes (ISR 5-min) → Shows updated metrics
+Client detail page shows activity timeline of all payment + communication events
 ```
 
 ### 7.4 Approval Workflow Detail
@@ -276,7 +292,7 @@ Dashboard refreshes (ISR 5-min) → Shows updated metrics
 ## 10. Out of Scope (MVP)
 
 - Tally/Zoho Books integration (planned for v2)
-- Multi-user team access (planned for v2)
+- Full multi-user team access with data migration (schema only — planned for v2)
 - Voice call reminders (planned for v3)
 - Legal escalation / auto-generate notices (planned for v3)
 - Credit scoring database (planned for v3)
@@ -284,6 +300,7 @@ Dashboard refreshes (ISR 5-min) → Shows updated metrics
 - API for third-party platforms (planned for v3)
 - LLM-powered message generation (planned for v2)
 - Auto-send capability (explicitly out of scope — core product principle)
+- Partial payment handling (planned for v2)
 
 ---
 
@@ -329,27 +346,44 @@ Dashboard refreshes (ISR 5-min) → Shows updated metrics
 
 ## 13. Implementation Status
 
+All P0 (MVP) and P1 features are **complete**. P2 features are in progress.
+
 | Task | Status | Notes |
 |------|--------|-------|
 | Project Setup | ✅ Done | Next.js 14 + TypeScript + Tailwind |
-| Dependencies | ✅ Done | Supabase, Razorpay, Resend, Upstash, lucide-react, zod |
-| Database Schema | ✅ Done | 9 tables (added message_drafts), 12 indexes, RLS, triggers |
+| Dependencies | ✅ Done | Supabase, Razorpay, Resend, Upstash, lucide-react, zod, papaparse |
+| Database Schema | ✅ Done | 12 tables, 13 indexes, RLS on all tables, triggers |
 | Environment Config | ✅ Done | .env.example + .env.local |
 | Supabase Client | ✅ Done | Browser, server, middleware, types |
 | Auth Pages | ✅ Done | Login, signup, forgot/reset password, callback |
-| Dashboard Layout | ✅ Done | Sidebar, overview page, loading state |
-| AI Engine | ⏳ Pending | Pivot from risk scoring to draft generation |
-| WhatsApp Deep Links | ⏳ Pending | wa.me link generator |
-| Draft Approval Queue | ⏳ Pending | Core UI component |
-| Razorpay Integration | ⏳ Pending | |
-| Webhook Handlers | ⏳ Pending | Razorpay only (no WhatsApp webhook needed) |
-| Client CRUD | ⏳ Pending | |
-| Invoice CRUD | ⏳ Pending | |
-| CSV Import | ⏳ Pending | |
-| Cron Jobs | ⏳ Pending | Draft generation replaces reminder dispatch |
-| Rate Limiting | ⏳ Pending | |
-| ISR Caching | ⏳ Pending | |
-| Tests (Integration/E2E) | ⏳ Pending | |
+| Dashboard Layout | ✅ Done | Sidebar, overview page, onboarding flow |
+| AI Engine | ✅ Done | Template-based message generation with 3 escalation levels, 3 style presets |
+| WhatsApp Deep Links | ✅ Done | wa.me link generation in approval flow |
+| Draft Approval Queue | ✅ Done | Full CRON → draft → review → approve → send flow |
+| Razorpay Integration | ✅ Done | Payment link generation, webhook handler |
+| Webhook Handlers | ✅ Done | Razorpay payment.captured with signature verification |
+| Client CRUD | ✅ Done | Add, edit, delete with consent tracking (DPDP) |
+| Invoice CRUD | ✅ Done | Create, edit, delete, status tracking, UPI links |
+| CSV Import | ✅ Done | 6-column CSV with per-field validation, client auto-creation, duplicate detection, error report |
+| Client Risk Cards | ✅ Done | Visual cards with risk score, outstanding, delay, on-time rate |
+| Client Activity Log | ✅ Done | Timeline of invoice/reminder events with icons, tabs on detail page |
+| Custom Message Templates | ✅ Done | Variable-based templates with preview, per language/escalation level |
+| Delivery Status Tracking | ✅ Done | Manual mark as sent/delivered/replied per draft |
+| Email Reminders | ✅ Done | Resend integration with fallback when no WhatsApp number |
+| Multilingual Support | ✅ Done | 5 languages: English, Hindi, Tamil, Telugu, Bengali |
+| Payment Reconciliation | ✅ Done | Manual + auto-match via Razorpay webhook, reconciliation dashboard |
+| Bulk Invoice Actions | ✅ Done | Multi-select checkboxes, batch mark paid, batch generate drafts |
+| Organization Schema | ✅ Done | Tables + RLS — full team mode deferred to later |
+| Rate Limiting | ✅ Done | 100 req/min per user via Upstash Redis |
+| ISR Caching | ✅ Done | 5-min revalidate on all dashboard pages |
+| Sentry Error Monitoring | ✅ Done | Global error boundary + Sentry SDK integration |
+| Vercel Config | ✅ Done | vercel.json with build/install commands |
+| CI/CD | ✅ Done | GitHub Actions: lint+test on push/PR, auto-deploy on master |
+| UI Primitives | ✅ Done | EmptyState, Skeleton, Toaster, Toasts on mutations |
+| Cron Jobs | ✅ Done | Daily 6 AM draft generation, payment reconciliation every 30 min |
+| Tests | ✅ Done | 168 tests across 16 suites — all passing |
+| Lint | ✅ Done | Zero warnings or errors |
+| Deployment | ⏳ Pending | Requires VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID in GitHub secrets |
 
 ---
 
@@ -367,9 +401,9 @@ Dashboard refreshes (ISR 5-min) → Shows updated metrics
 ## 15. Appendices
 
 ### A. Database Schema Summary
-- 9 tables: users, clients, invoices, reminders, message_drafts, payments, ai_predictions, consent_log, audit_log
-- 12 indexes for query performance
-- 9 RLS policies for data isolation
+- 12 tables: users, clients, invoices, reminders, message_drafts, payments, ai_predictions, consent_log, audit_log, client_events, custom_templates, payment_transactions, organizations, organization_members
+- 13 indexes for query performance
+- 15 RLS policies for data isolation
 - 1 trigger for payment amount validation
 
 ### B. Environment Variables (10 total)
@@ -381,6 +415,7 @@ Dashboard refreshes (ISR 5-min) → Shows updated metrics
 
 ### C. Key Dependencies
 - @supabase/supabase-js, @supabase/ssr
-- razorpay, resend, @upstash/redis
-- lucide-react, zod, csv-parse
+- razorpay, resend, @upstash/redis, @upstash/ratelimit
+- lucide-react, zod, papaparse
+- react-hot-toast, @sentry/nextjs
 - jest, @testing-library/react

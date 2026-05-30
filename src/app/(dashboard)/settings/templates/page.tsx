@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { getTemplates } from '@/lib/ai/custom-templates'
-import { Plus, FileText, Pencil, Trash2 } from 'lucide-react'
+import { Plus, FileText, Pencil } from 'lucide-react'
 import { DeleteTemplateButton } from './delete-button'
 
 export const metadata: Metadata = { title: 'Message Templates' }
