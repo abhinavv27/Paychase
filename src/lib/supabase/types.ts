@@ -183,6 +183,9 @@ export interface Database {
           whatsapp_message_id: string | null
           error_message: string | null
           created_at: string
+          approval_status: string
+          sent_method: string | null
+          user_edited: boolean
         }
         Insert: {
           id?: string
@@ -201,6 +204,9 @@ export interface Database {
           whatsapp_message_id?: string | null
           error_message?: string | null
           created_at?: string
+          approval_status?: string
+          sent_method?: string | null
+          user_edited?: boolean
         }
         Update: {
           id?: string
@@ -219,6 +225,9 @@ export interface Database {
           whatsapp_message_id?: string | null
           error_message?: string | null
           created_at?: string
+          approval_status?: string
+          sent_method?: string | null
+          user_edited?: boolean
         }
       }
       payments: {
