@@ -26,14 +26,14 @@ PayChase AI removes the awkwardness of chasing payments. Every day, our AI gener
 
 ### Key Features
 
-- **AI-Drafted Messages** ΓÇö Relationship-aware follow-ups with escalation levels (gentle/firm/urgent) and your personal style (casual/professional/formal)
-- **You Review, You Send** ΓÇö Every draft requires your approval. Messages are NEVER auto-sent
-- **WhatsApp Deep Links** ΓÇö One-click `wa.me` links open WhatsApp with the message pre-filled. You hit send from your own number
-- **Approval Workflow** ΓÇö Cron generates drafts overnight ΓåÆ you see them in your dashboard ΓåÆ approve with one click ΓåÆ opens WhatsApp ready to send
-- **Response History Awareness** ΓÇö AI knows if the client replied, promised to pay, or went silent ΓÇö and adjusts the next draft accordingly
-- **UPI Payment Links** ΓÇö Razorpay integration for instant UPI payments embedded in messages
-- **Cash Flow Forecast** ΓÇö Predict incoming revenue with confidence intervals
-- **DPDP Compliant** ΓÇö Consent tracking, data deletion, and retention policies from day 1
+- **AI-Drafted Messages** -- Relationship-aware follow-ups with escalation levels (gentle/firm/urgent) and your personal style (casual/professional/formal)
+- **You Review, You Send** -- Every draft requires your approval. Messages are NEVER auto-sent
+- **WhatsApp Deep Links** -- One-click `wa.me` links open WhatsApp with the message pre-filled. You hit send from your own number
+- **Approval Workflow** -- Cron generates drafts overnight -> you see them in your dashboard -> approve with one click -> opens WhatsApp ready to send
+- **Response History Awareness** -- AI knows if the client replied, promised to pay, or went silent -- and adjusts the next draft accordingly
+- **UPI Payment Links** -- Razorpay integration for instant UPI payments embedded in messages
+- **Cash Flow Forecast** -- Predict incoming revenue with confidence intervals
+- **DPDP Compliant** -- Consent tracking, data deletion, and retention policies from day 1
 
 ## Tech Stack
 
@@ -51,42 +51,42 @@ PayChase AI removes the awkwardness of chasing payments. Every day, our AI gener
 ## Architecture
 
 ```
-ΓöîΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÉ
-Γöé                    USER DASHBOARD (Next.js)                     Γöé
-Γöé                   (ISR cached, 5-min revalidate)                Γöé
-Γöé                                                                 Γöé
-Γöé  ΓöîΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÉ ΓöîΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÉ ΓöîΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÉ ΓöîΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÉ          Γöé
-Γöé  Γöé ≡ƒÆ░ Cash  Γöé Γöé ≡ƒôè ClientΓöé Γöé ≡ƒñû AI    Γöé Γöé Γ£à Draft Γöé Γöé          Γöé
-Γöé  Γöé  Flow    Γöé Γöé  Risk    Γöé Γöé Drafts   Γöé Γöé  Approve Γöé Γöé          Γöé
-Γöé  ΓööΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÿ ΓööΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÿ ΓööΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÿ ΓööΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÿ          Γöé
-Γöé                                                                 Γöé
-Γöé  ΓöîΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÉ ΓöîΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÉ ΓöîΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÉ ΓöîΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÉ          Γöé
-Γöé  Γöé ≡ƒôä InvoiceΓöé Γöé ≡ƒöä Tally Γöé Γöé ≡ƒôê RecoveryΓöé Γöé ΓÜÖ∩╕Å SettingsΓöé Γöé          Γöé
-Γöé  Γöé  Manager Γöé Γöé  /Zoho   Γöé Γöé Analytics Γöé Γöé          Γöé Γöé          Γöé
-Γöé  ΓööΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÿ ΓööΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÿ ΓööΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÿ ΓööΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÿ          Γöé
-ΓööΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓö¼ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÿ
-                               Γöé
++---------------------------------------------------------------+
+|                    USER DASHBOARD (Next.js)                   |
+|                   (ISR cached, 5-min revalidate)              |
+|                                                               |
+|  +----------+ +----------+ +----------+ +----------+          |
+|  | Cash     | | Client   | | AI       | | Draft    |          |
+|  | Flow     | | Risk     | | Drafts   | | Approve  |          |
+|  +----------+ +----------+ +----------+ +----------+          |
+|                                                               |
+|  +----------+ +----------+ +----------+ +----------+          |
+|  | Invoice  | | Tally    | | Recovery | | Settings |          |
+|  | Manager  | | /Zoho    | | Analytics| |          |          |
+|  +----------+ +----------+ +----------+ +----------+          |
++-------------------------------+-------------------------------+
+                                |
               Next.js API Routes + Vercel Cron + Rate Limiting
-                               Γöé
-       ΓöîΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓö╝ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÉ
-       Γöé                       Γöé                               Γöé
-  ΓöîΓöÇΓöÇΓöÇΓöÇΓû╝ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÉ          ΓöîΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓû╝ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÉ                ΓöîΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓû╝ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÉ
-  Γöé Supabase Γöé          Γöé AI Draft    Γöé                Γöé  WhatsApp     Γöé
-  Γöé (PostgresΓöé          Γöé Engine      Γöé                Γöé  Deep Links   Γöé
-  Γöé  + RLS)  Γöé          Γöé             Γöé                Γöé               Γöé
-  Γöé ΓÇó Users  Γöé          Γöé ΓÇó EscalationΓöé                Γöé ΓÇó wa.me links Γöé
-  Γöé ΓÇó ClientsΓöé          Γöé   levels    Γöé                Γöé ΓÇó User's own  Γöé
-  Γöé ΓÇó InvoiceΓöé          Γöé ΓÇó Style     Γöé                Γöé   number      Γöé
-  Γöé ΓÇó PaymentΓöé          Γöé   presets   Γöé                Γöé ΓÇó Razorpay    Γöé
-  Γöé ΓÇó Drafts Γöé          Γöé ΓÇó Response  Γöé                Γöé   (UPI)       Γöé
-  ΓööΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÿ          Γöé   history   Γöé                ΓööΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÿ
-                        ΓööΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÿ
+                                |
+       +------------------------+------------------------+
+       |                        |                        |
+  +----v----+            +------v------+          +------v--------+
+  | Supabase|            | AI Draft    |          |  WhatsApp     |
+  | (Postgres|           | Engine      |          |  Deep Links   |
+  |  + RLS)  |            |             |          |               |
+  | * Users  |            | * Escalation|          | * wa.me links |
+  | * Clients|            |   levels    |          | * User's own  |
+  | * Invoice|            | * Style     |          |   number      |
+  | * Payment|            |   presets   |          | * Razorpay    |
+  | * Drafts |            | * Response  |          |   (UPI)       |
+  +----------+            |   history   |          +---------------+
+                          +-------------+
 
   FLOW:
-  1. Cron ΓåÆ AI Draft Engine generates message drafts
-  2. Drafts stored in Supabase ΓåÆ appear in dashboard
+  1. Cron -> AI Draft Engine generates message drafts
+  2. Drafts stored in Supabase -> appear in dashboard
   3. User reviews + approves draft
-  4. Approved ΓåÆ wa.me link opens WhatsApp with pre-filled message
+  4. Approved -> wa.me link opens WhatsApp with pre-filled message
   5. User hits send from their own number
 ```
 
@@ -104,8 +104,8 @@ PayChase AI removes the awkwardness of chasing payments. Every day, our AI gener
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/your-org/paychase-ai.git
-   cd paychase-ai
+   git clone https://github.com/abhinavv27/Paychase.git
+   cd Paychase
    ```
 
 2. **Install dependencies**
@@ -155,55 +155,49 @@ PayChase AI removes the awkwardness of chasing payments. Every day, our AI gener
 
 ```
 paychase-ai/
-Γö£ΓöÇΓöÇ app/
-Γöé   Γö£ΓöÇΓöÇ (auth)/                    # Auth route group
-Γöé   Γöé   Γö£ΓöÇΓöÇ login/page.tsx         # Login page
-Γöé   Γöé   Γö£ΓöÇΓöÇ signup/page.tsx        # Signup page
-Γöé   Γöé   Γö£ΓöÇΓöÇ forgot-password/page.tsx
-Γöé   Γöé   ΓööΓöÇΓöÇ reset-password/page.tsx
-Γöé   Γö£ΓöÇΓöÇ (dashboard)/               # Dashboard route group
-Γöé   Γöé   Γö£ΓöÇΓöÇ layout.tsx             # Dashboard layout with sidebar
-Γöé   Γöé   Γö£ΓöÇΓöÇ page.tsx               # Overview page
-Γöé   Γöé   Γö£ΓöÇΓöÇ clients/page.tsx       # Client management
-Γöé   Γöé   Γö£ΓöÇΓöÇ invoices/page.tsx      # Invoice management
-Γöé   Γöé   Γö£ΓöÇΓöÇ drafts/page.tsx        # AI draft approval queue
-Γöé   Γöé   Γö£ΓöÇΓöÇ insights/page.tsx      # AI insights
-Γöé   Γöé   ΓööΓöÇΓöÇ analytics/page.tsx     # Recovery analytics
-Γöé   Γö£ΓöÇΓöÇ api/
-Γöé   Γöé   Γö£ΓöÇΓöÇ webhooks/
-Γöé   Γöé   Γöé   ΓööΓöÇΓöÇ razorpay/route.ts  # Razorpay webhook handler
-Γöé   Γöé   ΓööΓöÇΓöÇ cron/
-Γöé   Γöé       Γö£ΓöÇΓöÇ ai-drafts/route.ts       # Generate message drafts
-Γöé   Γöé       ΓööΓöÇΓöÇ payment-reconciliation/route.ts
-Γöé   ΓööΓöÇΓöÇ auth/callback/route.ts     # Supabase auth callback
-Γö£ΓöÇΓöÇ lib/
-Γöé   Γö£ΓöÇΓöÇ supabase/
-Γöé   Γöé   Γö£ΓöÇΓöÇ client.ts              # Browser Supabase client
-Γöé   Γöé   Γö£ΓöÇΓöÇ server.ts              # Server Supabase client
-Γöé   Γöé   Γö£ΓöÇΓöÇ middleware.ts          # Session middleware
-Γöé   Γöé   ΓööΓöÇΓöÇ types.ts               # Database TypeScript types
-Γöé   Γö£ΓöÇΓöÇ ai/
-Γöé   Γöé   Γö£ΓöÇΓöÇ draft-generator.ts     # AI message draft generation
-Γöé   Γöé   Γö£ΓöÇΓöÇ escalation-logic.ts    # Gentle ΓåÆ firm ΓåÆ urgent escalation
-Γöé   Γöé   Γö£ΓöÇΓöÇ style-presets.ts       # Casual / professional / formal
-Γöé   Γöé   Γö£ΓöÇΓöÇ response-history.ts    # Client response awareness
-Γöé   Γöé   ΓööΓöÇΓöÇ __tests__/             # AI engine tests
-Γöé   Γö£ΓöÇΓöÇ whatsapp/
-Γöé   Γöé   Γö£ΓöÇΓöÇ deep-link.ts           # wa.me link generator
-Γöé   Γöé   ΓööΓöÇΓöÇ deep-link.test.ts      # Deep link tests
-Γöé   Γö£ΓöÇΓöÇ razorpay/                  # Razorpay integration
-Γöé   Γö£ΓöÇΓöÇ email/                     # Resend email integration
-Γöé   ΓööΓöÇΓöÇ rate-limit.ts              # Upstash Redis rate limiting
-Γö£ΓöÇΓöÇ supabase/
-Γöé   ΓööΓöÇΓöÇ migrations/
-Γöé       ΓööΓöÇΓöÇ 001_initial_schema.sql # Database schema
-Γö£ΓöÇΓöÇ components/
-Γöé   Γö£ΓöÇΓöÇ ui/                        # shadcn/ui components
-Γöé   Γö£ΓöÇΓöÇ dashboard/                 # Dashboard-specific components
-Γöé   ΓööΓöÇΓöÇ forms/                     # Reusable form components
-Γö£ΓöÇΓöÇ .env.example                   # Environment template
-Γö£ΓöÇΓöÇ .env.local                     # Local secrets (gitignored)
-ΓööΓöÇΓöÇ middleware.ts                  # Next.js middleware
++-- app/
+|   +-- (auth)/                    # Auth route group
+|   |   +-- login/page.tsx
+|   |   +-- signup/page.tsx
+|   |   +-- forgot-password/page.tsx
+|   |   +-- reset-password/page.tsx
+|   +-- (dashboard)/               # Dashboard route group
+|   |   +-- layout.tsx
+|   |   +-- page.tsx               # Overview / dashboard
+|   |   +-- clients/               # Client management
+|   |   +-- invoices/              # Invoice management
+|   |   +-- approvals/             # AI draft approval queue
+|   |   +-- insights/              # AI insights
+|   |   +-- analytics/             # Recovery analytics
+|   |   +-- reconciliation/        # Payment reconciliation
+|   |   +-- settings/              # User settings
+|   |   +-- onboarding/            # Onboarding flow
+|   +-- api/
+|       +-- webhooks/razorpay/route.ts
+|       +-- cron/                   # Vercel cron jobs
+|       +-- invoices/               # Invoice API routes
+|       +-- clients/                # Client API routes
++-- components/
+|   +-- ui/                        # UI primitives
+|   +-- dashboard/                 # Dashboard widgets
+|   +-- clients/                   # Client components
+|   +-- invoices/                  # Invoice components
+|   +-- approvals/                 # Draft approval components
+|   +-- payments/                  # Payment components
+|   +-- templates/                 # Message template components
++-- lib/
+|   +-- supabase/                  # Supabase client + server helpers
+|   +-- ai/                        # AI engine (message generation, risk scoring)
+|   +-- whatsapp/                  # WhatsApp bot + deep link
+|   +-- razorpay/                  # Payment integration
+|   +-- email/                     # Resend email module
+|   +-- csv/                       # CSV import utilities
+|   +-- invoices/                  # Invoice business logic
+|   +-- rate-limit/                # Upstash Redis rate limiting
++-- supabase/migrations/           # Database migrations
++-- e2e/                           # Playwright end-to-end tests
++-- .env.example
++-- middleware.ts
 ```
 
 ## Database Schema
@@ -222,26 +216,22 @@ paychase-ai/
 | `consent_log` | DPDP consent audit trail |
 | `audit_log` | System audit log |
 
-See `supabase/migrations/001_initial_schema.sql` for the full schema.
-
 ## AI Engine
-
-### Message Draft Generation
 
 The AI engine generates follow-up message drafts based on:
 
-- **Escalation level** ΓÇö Determines tone progression:
-  - `gentle` ΓÇö First nudge, assumes they forgot
-  - `firm` ΓÇö Second follow-up, references previous message
-  - `urgent` ΓÇö Third+ follow-up, clear deadline
-- **User style preset** ΓÇö How you like to communicate:
-  - `casual` ΓÇö Friendly, conversational, emoji-friendly
-  - `professional` ΓÇö Clear, respectful, business-appropriate
-  - `formal` ΓÇö Structured, reference-heavy, official tone
-- **Response history** ΓÇö AI knows what happened last time:
-  - Client replied promising payment ΓåÆ draft acknowledges and follows up
-  - Client went silent ΓåÆ draft escalates appropriately
-  - Client disputed amount ΓåÆ draft references resolution
+- **Escalation level** -- Determines tone progression:
+  - `gentle` -- First nudge, assumes they forgot
+  - `firm` -- Second follow-up, references previous message
+  - `urgent` -- Third+ follow-up, clear deadline
+- **User style preset** -- How you like to communicate:
+  - `casual` -- Friendly, conversational, emoji-friendly
+  - `professional` -- Clear, respectful, business-appropriate
+  - `formal` -- Structured, reference-heavy, official tone
+- **Response history** -- AI knows what happened last time:
+  - Client replied promising payment -> draft acknowledges and follows up
+  - Client went silent -> draft escalates appropriately
+  - Client disputed amount -> draft references resolution
 
 ```typescript
 // Example draft output
@@ -251,7 +241,7 @@ The AI engine generates follow-up message drafts based on:
   invoice_amount: 25000,
   escalation_level: "gentle",
   style: "professional",
-  message: "Hi Rahul, hope you're doing well. Just a quick reminder that invoice #INV-2026-042 (Γé╣25,000) was due on May 15. Please let me know if you need any details from my end. You can pay directly here: razorpay.me/xyz",
+  message: "Hi Rahul, hope you're doing well. Just a quick reminder that invoice #INV-2026-042 (Rs 25,000) was due on May 15...",
   generated_at: "2026-05-21T06:00:00Z",
   status: "pending"  // pending | approved | sent | dismissed
 }
@@ -277,14 +267,12 @@ All cron jobs are paginated (100 records/batch) to avoid Vercel's 60s serverless
 
 | Tier | Price | Invoices | Features |
 |------|-------|----------|----------|
-| **Free** | Γé╣0/month | 10 | Basic drafts, manual review |
-| **Starter** | Γé╣999/month | 50 | AI drafts, escalation levels, style presets |
-| **Growth** | Γé╣2,999/month | 500 | Response history, multilingual drafts, UPI links |
-| **Business** | Γé╣7,999/month | Unlimited | Tally/Zoho sync, team access, custom flows |
+| **Free** | Rs 0/month | 10 | Basic drafts, manual review |
+| **Starter** | Rs 999/month | 50 | AI drafts, escalation levels, style presets |
+| **Growth** | Rs 2,999/month | 500 | Response history, multilingual drafts, UPI links |
+| **Business** | Rs 7,999/month | Unlimited | Tally/Zoho sync, team access, custom flows |
 
 ## Development
-
-### Available Scripts
 
 ```bash
 npm run dev       # Start development server
@@ -332,10 +320,9 @@ PayChase AI is designed to comply with India's Digital Personal Data Protection 
 
 ## License
 
-MIT ΓÇö see [LICENSE](LICENSE) for details.
+MIT -- see [LICENSE](LICENSE) for details.
 
 ## Contact
 
 - **Website:** [paychase.ai](https://paychase.ai) (coming soon)
-- **Twitter:** [@paychaseai](https://twitter.com/paychaseai) (coming soon)
 - **Email:** hello@paychase.ai
