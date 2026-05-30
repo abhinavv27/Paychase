@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient, asDb } from '@/lib/supabase/admin'
 import { requireCronAuth, apiError } from '@/lib/api-helpers'
 import { generateFollowUpMessage } from '@/lib/ai/message-generator'
+import type { Language } from '@/lib/ai/translations'
 import { getOptimalSendTime } from '@/lib/ai/smart-timing'
+import { sendEmail, paymentReminderEmail } from '@/lib/email'
 
 const BATCH_SIZE = 100
 
@@ -22,7 +24,7 @@ export async function GET(request: NextRequest) {
     while (hasMore) {
       const { data: overdueInvoices, error } = await supabase
         .from('invoices')
-        .select('*, client:clients(name, phone, email, on_time_rate, risk_score)')
+        .select('*, client:clients(name, phone, email, on_time_rate, risk_score, preferred_language)')
         .eq('status', 'pending')
         .lt('due_date', today)
         .range(offset, offset + BATCH_SIZE - 1)
@@ -72,12 +74,58 @@ export async function GET(request: NextRequest) {
           // Fetch user info for rate limiting
           const { data: user } = await supabase
             .from('users')
-            .select('phone, plan, style_preference')
+            .select('phone, email, plan, style_preference')
             .eq('id', userId)
             .single()
 
-          const typedUser = user as { phone: string | null; plan: string | null; style_preference: string | null } | null
-          if (!typedUser?.phone) continue
+          const typedUser = user as { phone: string | null; email: string | null; plan: string | null; style_preference: string | null } | null
+          if (!typedUser?.phone) {
+            if (!typedUser?.email) {
+              totalSkipped++
+              continue
+            }
+            const dueDateEmail = new Date(invoice.due_date)
+            const daysOverdueEmail = Math.floor((Date.now() - dueDateEmail.getTime()) / (1000 * 60 * 60 * 24))
+
+            const amountStr = `₹${Number(invoice.amount).toLocaleString('en-IN')}`
+            const escalationLevel = daysOverdueEmail <= 3 ? 'gentle' : daysOverdueEmail <= 14 ? 'firm' : 'urgent'
+
+            const emailContent = paymentReminderEmail({
+              clientName: client.name as string,
+              invoiceNumber: invoice.id.slice(0, 8).toUpperCase(),
+              amount: amountStr,
+              dueDate: dueDateEmail.toLocaleDateString('en-IN'),
+              daysOverdue: daysOverdueEmail,
+              escalationLevel,
+            })
+
+            const { error: emailInsertError } = await asDb(supabase).from('reminders').insert({
+              user_id: userId,
+              invoice_id: invoice.id,
+              client_id: invoice.client_id,
+              channel: 'email',
+              template_type: 'payment_followup',
+              message_text: emailContent.html.slice(0, 500),
+              language: 'en',
+              status: 'draft',
+              approval_status: 'draft',
+            } as Record<string, unknown>)
+
+            if (emailInsertError) {
+              console.error('Failed to insert email draft:', emailInsertError)
+              totalSkipped++
+              continue
+            }
+
+            await sendEmail({
+              to: typedUser.email,
+              subject: emailContent.subject,
+              html: emailContent.html,
+            }).catch((e) => console.error('Failed to send email reminder:', e))
+
+            totalDrafts++
+            continue
+          }
           if (typedUser.plan === 'paused') continue
 
            const userStyle = (typedUser?.style_preference as string) || 'professional'
@@ -124,6 +172,7 @@ export async function GET(request: NextRequest) {
             onTimeRate: Number(client.on_time_rate || 0),
             reminderCount: 0,
             userStyle: userStyle as 'casual' | 'professional' | 'formal',
+            language: (client.preferred_language as Language) || 'en',
           }
 
           const aiMessage = generateFollowUpMessage(messageContext)

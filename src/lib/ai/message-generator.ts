@@ -1,3 +1,6 @@
+import { getTranslation } from './translations'
+import type { Language } from './translations'
+
 export interface MessageContext {
   clientName: string
   invoiceNumber: string
@@ -9,6 +12,7 @@ export interface MessageContext {
   lastResponse?: string
   userStyle?: 'casual' | 'professional' | 'formal'
   upiLink?: string
+  language?: Language
 }
 
 export interface GeneratedMessage {
@@ -19,7 +23,7 @@ export interface GeneratedMessage {
 }
 
 export function generateFollowUpMessage(context: MessageContext): GeneratedMessage {
-  const { clientName, invoiceNumber, amount, dueDate, daysOverdue, reminderCount, lastResponse, userStyle = 'professional', upiLink } = context
+  const { clientName, invoiceNumber, amount, dueDate, daysOverdue, reminderCount, lastResponse, userStyle = 'professional', upiLink, language } = context
 
   let escalationLevel: 'gentle' | 'firm' | 'urgent' = 'gentle'
 
@@ -44,6 +48,7 @@ export function generateFollowUpMessage(context: MessageContext): GeneratedMessa
     escalationLevel,
     userStyle,
     upiLink,
+    language,
   })
 
   return { 
@@ -65,40 +70,25 @@ function generateMessageText(params: {
   escalationLevel: 'gentle' | 'firm' | 'urgent'
   userStyle: 'casual' | 'professional' | 'formal'
   upiLink?: string
+  language?: Language
 }): string {
-  const { clientName, invoiceNumber, amount, dueDate, daysOverdue, escalationLevel, userStyle, upiLink } = params
+  const { clientName, invoiceNumber, amount, dueDate, daysOverdue, escalationLevel, userStyle, upiLink, language = 'en' } = params
 
   const amountStr = `₹${amount.toLocaleString('en-IN')}`
-  const dateStr = daysOverdue > 0 ? `${daysOverdue} days ago` : dueDate
-  const paymentLink = upiLink ? `\n\nPay here: ${upiLink}` : ''
+  const overdueText = daysOverdue > 0
+    ? `${daysOverdue} ${language === 'hi' ? 'दिन' : language === 'ta' ? 'நாட்கள்' : language === 'te' ? 'రోజులు' : language === 'bn' ? 'দিন' : 'days'} ${language === 'hi' ? 'अतिदेय' : language === 'ta' ? 'தாமதமானது' : language === 'te' ? 'ఆలస్యం' : language === 'bn' ? 'অতিদেরী' : 'overdue'}`
+    : dueDate
 
-  if (escalationLevel === 'gentle') {
-    if (userStyle === 'casual') {
-      return `Hey ${clientName}! 👋 Just a quick reminder about invoice ${invoiceNumber} for ${amountStr} (due ${dateStr}). No rush, just didn't want it to slip through the cracks!${paymentLink}`
-    }
-    if (userStyle === 'formal') {
-      return `Dear ${clientName}, I hope this message finds you well. This is a gentle reminder regarding invoice ${invoiceNumber} for ${amountStr}, which was due on ${dateStr}. Please let me know if you need any clarification.${paymentLink}`
-    }
-    return `Hi ${clientName}, hope you're doing well. Just a friendly reminder about invoice ${invoiceNumber} for ${amountStr} (due ${dateStr}). Please let me know if there's anything you need from my end.${paymentLink}`
-  }
+  const translate = getTranslation(language, escalationLevel, userStyle)
 
-  if (escalationLevel === 'firm') {
-    if (userStyle === 'casual') {
-      return `Hey ${clientName}, following up on invoice ${invoiceNumber} for ${amountStr}. It's been ${daysOverdue > 0 ? `${daysOverdue} days overdue` : `due since ${dueDate}`}. Could you please update me on the payment status?${paymentLink}`
-    }
-    if (userStyle === 'formal') {
-      return `Dear ${clientName}, I am writing to follow up on invoice ${invoiceNumber} for ${amountStr}, which is now ${daysOverdue > 0 ? `${daysOverdue} days overdue` : `due since ${dueDate}`}. I would appreciate an update on the payment timeline.${paymentLink}`
-    }
-    return `Hi ${clientName}, following up on invoice ${invoiceNumber} for ${amountStr}. This is now ${daysOverdue > 0 ? `${daysOverdue} days overdue` : `due since ${dueDate}`}. Could you please provide an update on when I can expect the payment?${paymentLink}`
-  }
-
-  if (userStyle === 'casual') {
-    return `${clientName}, invoice ${invoiceNumber} for ${amountStr} is now ${daysOverdue > 0 ? `${daysOverdue} days overdue` : `long overdue (due ${dueDate})`}. I need this resolved this week. Please let me know when the payment will be processed.${paymentLink}`
-  }
-  if (userStyle === 'formal') {
-    return `Dear ${clientName}, this is an urgent follow-up regarding invoice ${invoiceNumber} for ${amountStr}, which is now ${daysOverdue > 0 ? `${daysOverdue} days overdue` : `long overdue (due ${dueDate})`}. I request immediate payment or a clear timeline for settlement.${paymentLink}`
-  }
-  return `Hi ${clientName}, invoice ${invoiceNumber} for ${amountStr} is now ${daysOverdue > 0 ? `${daysOverdue} days overdue` : `long overdue (due ${dueDate})`}. I need this resolved urgently. Please confirm when the payment will be processed.${paymentLink}`
+  return translate({
+    clientName,
+    invoiceNumber,
+    amount: amountStr,
+    dateStr: dueDate,
+    overdueText,
+    paymentLink: upiLink || '',
+  })
 }
 
 export function generateBatchMessages(invoices: MessageContext[]): GeneratedMessage[] {

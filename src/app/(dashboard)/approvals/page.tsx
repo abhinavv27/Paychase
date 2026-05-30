@@ -2,8 +2,11 @@
 import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import Link from "next/link"
-import { ArrowLeft } from "lucide-react"
+import { ArrowLeft, Clock } from "lucide-react"
+
+export const revalidate = 300
 import { ApproveButton, DismissButton } from "@/components/approvals/draft-actions"
+import { DeliveryStatus } from "@/components/approvals/delivery-status"
 
 export const metadata: Metadata = {
   title: "Approvals",
@@ -62,6 +65,23 @@ export default async function ApprovalsPage() {
               <div className="mt-3 p-3 bg-gray-50 rounded text-sm text-gray-700 italic">
                 &ldquo;{draft.message_text}&rdquo;
               </div>
+              {draft.scheduled_send_at && (
+                <div className="mt-2 flex items-center gap-1.5 text-xs text-gray-400">
+                  <Clock className="w-3.5 h-3.5" />
+                  Scheduled for{' '}
+                  {new Date(draft.scheduled_send_at).toLocaleDateString('en-IN', {
+                    weekday: 'short',
+                    day: 'numeric',
+                    month: 'short',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
+                </div>
+              )}
+              <DeliveryStatus
+                draftId={draft.id}
+                initialStatus={draft.status as 'draft' | 'sent' | 'delivered' | 'responded'}
+              />
               <div className="mt-3 flex gap-2">
                 <ApproveButton draftId={draft.id} />
                 <DismissButton draftId={draft.id} />

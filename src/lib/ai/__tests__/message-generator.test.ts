@@ -77,7 +77,6 @@ describe('generateFollowUpMessage', () => {
     }))
 
     expect(casualGentle.text).toContain('Hey')
-    expect(casualGentle.text).toContain('👋')
 
     const casualFirm = generateFollowUpMessage(createContext({
       daysOverdue: 10,

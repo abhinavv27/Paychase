@@ -4,6 +4,8 @@ import { ActionBanner } from '@/components/dashboard/action-banner'
 import { HealthScore } from '@/components/dashboard/health-score'
 import { calculateCollectionHealth } from '@/lib/ai/collection-health'
 
+export const revalidate = 300
+
 export const metadata: Metadata = {
   title: 'Dashboard',
 }

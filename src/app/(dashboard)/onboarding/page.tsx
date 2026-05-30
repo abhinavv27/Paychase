@@ -3,7 +3,8 @@
 import { useState } from 'react'
 import { useFormState } from 'react-dom'
 import { completeOnboarding, skipOnboarding } from '@/lib/onboarding/actions'
-import { ArrowRight, ArrowLeft, Building2, MessageSquare, Rocket } from 'lucide-react'
+import { ArrowRight, ArrowLeft, Building2, MessageSquare, Rocket, Users } from 'lucide-react'
+import { QuickAddClient } from './add-client'
 
 const styles = [
   { value: 'casual', label: 'Casual', desc: 'Friendly and relaxed tone' },
@@ -25,14 +26,14 @@ export default function OnboardingPage() {
       <div className="w-full max-w-lg">
         {/* Progress stepper */}
         <div className="flex items-center justify-center mb-8">
-          {[1, 2, 3].map((s) => (
+          {[1, 2, 3, 4].map((s) => (
             <div key={s} className="flex items-center">
               <div
                 className={`w-3 h-3 rounded-full transition-colors duration-300 ${
                   s <= step ? 'bg-indigo-600' : 'bg-gray-300'
                 }`}
               />
-              {s < 3 && (
+              {s < 4 && (
                 <div
                   className={`w-16 h-0.5 mx-2 transition-colors duration-300 ${
                     s < step ? 'bg-indigo-600' : 'bg-gray-300'
@@ -163,8 +164,22 @@ export default function OnboardingPage() {
             </div>
           )}
 
+          {/* Step 4: Add first client */}
+          {step === 4 && (
+            <div className="space-y-6">
+              <div className="text-center">
+                <div className="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center mx-auto mb-4">
+                  <Users className="w-6 h-6 text-indigo-600" />
+                </div>
+              </div>
+              <QuickAddClient
+                onClientAdded={() => {}}
+              />
+            </div>
+          )}
+
           {/* Navigation */}
-          {step < 3 && (
+          {step < 4 && (
             <div className="mt-8 flex items-center justify-between">
               {step > 1 ? (
                 <button
