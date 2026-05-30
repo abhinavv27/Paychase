@@ -1,8 +1,13 @@
+import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
 import { calculateRiskScore, predictPaymentDate } from '@/lib/ai'
 import { RiskDistribution } from '@/components/analytics/risk-distribution'
 import { StatCard } from '@/components/analytics/stat-card'
 import { AlertTriangle, TrendingUp, Calendar, DollarSign } from 'lucide-react'
+
+export const metadata: Metadata = {
+  title: 'AI Insights',
+}
 
 interface ClientRiskData {
   id: string
@@ -26,81 +31,37 @@ interface LatePaymentPrediction {
   days_until_due: number
 }
 
-async function fetchClientRiskData(): Promise<ClientRiskData[]> {
-  const supabase = createClient()
-  const { data, error } = await supabase
-    .from('clients')
-    .select('*')
-    .order('risk_score', { ascending: false })
-
-  if (error) {
-    console.error('Error fetching client risk data:', error)
-    return []
-  }
-
-  return data as ClientRiskData[]
-}
-
-async function fetchInvoices(): Promise<any[]> {
-  const supabase = createClient()
-  const { data, error } = await supabase
-    .from('invoices')
-    .select('*, clients(name)')
-    .eq('status', 'pending')
-
-  if (error) {
-    console.error('Error fetching invoices:', error)
-    return []
-  }
-
-  return data
-}
-
-async function fetchReminders(): Promise<any[]> {
-  const supabase = createClient()
-  const { data, error } = await supabase
-    .from('reminders')
-    .select('sent_at, read_at, responded_at')
-
-  if (error) {
-    console.error('Error fetching reminders:', error)
-    return []
-  }
-
-  return data
-}
-
-function getOptimalCollectionDay(reminders: any[]): string {
-  if (reminders.length === 0) return 'Tuesday'
-
-  const dayResponses: Record<number, number> = {}
-  for (let d = 0; d < 7; d++) dayResponses[d] = 0
-
-  for (const reminder of reminders) {
-    if (reminder.responded_at || reminder.read_at) {
-      const responseTime = new Date(reminder.responded_at || reminder.read_at)
-      const day = responseTime.getDay()
-      dayResponses[day]++
-    }
-  }
-
-  const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
-  let maxDay = 2
-  let maxCount = 0
-  for (const [day, count] of Object.entries(dayResponses)) {
-    if (count > maxCount) {
-      maxCount = count
-      maxDay = parseInt(day)
-    }
-  }
-
-  return dayNames[maxDay]
-}
-
 export default async function InsightsPage() {
-  const clients = await fetchClientRiskData()
-  const invoices = await fetchInvoices()
-  const reminders = await fetchReminders()
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return null
+
+  const [clients, invoices, reminders] = await Promise.all([
+    supabase
+      .from('clients')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('risk_score', { ascending: false })
+      .then(({ data }) => (data || []) as ClientRiskData[]),
+    supabase
+      .from('invoices')
+      .select('*, clients(name)')
+      .eq('user_id', user.id)
+      .eq('status', 'pending')
+      .then(({ data }) => (data || []) as Array<{
+        id: string
+        client_id: string
+        invoice_number: string
+        due_date: string
+        amount: number
+        clients: { name: string } | null
+      }>),
+    supabase
+      .from('reminders')
+      .select('sent_at, read_at, responded_at')
+      .eq('user_id', user.id)
+      .then(({ data }) => (data || []) as Array<{ sent_at: string | null; read_at: string | null; responded_at: string | null }>),
+  ])
 
   const predictions: LatePaymentPrediction[] = []
   let lowRisk = 0
@@ -157,6 +118,7 @@ export default async function InsightsPage() {
 
   return (
     <div className="space-y-8">
+
       <div>
         <h1 className="text-2xl font-bold text-gray-900">AI Insights</h1>
         <p className="mt-1 text-sm text-gray-500">
@@ -164,7 +126,6 @@ export default async function InsightsPage() {
         </p>
       </div>
 
-      {/* Stat cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           title="High Risk Clients"
@@ -189,10 +150,8 @@ export default async function InsightsPage() {
         />
       </div>
 
-      {/* Risk distribution */}
       <RiskDistribution low={lowRisk} medium={mediumRisk} high={highRisk} />
 
-      {/* Late payment predictions */}
       <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
         <div className="px-6 py-4 border-b border-gray-200">
           <h2 className="text-lg font-semibold text-gray-900">
@@ -251,4 +210,34 @@ export default async function InsightsPage() {
       </div>
     </div>
   )
+}
+
+function getOptimalCollectionDay(
+  reminders: Array<{ sent_at: string | null; read_at: string | null; responded_at: string | null }>
+): string {
+  if (reminders.length === 0) return 'Tuesday'
+
+  const dayResponses: Record<number, number> = {}
+  for (let d = 0; d < 7; d++) dayResponses[d] = 0
+
+  for (const reminder of reminders) {
+    const responseTimeStr = reminder.responded_at || reminder.read_at
+    if (responseTimeStr) {
+      const responseTime = new Date(responseTimeStr)
+      const day = responseTime.getDay()
+      dayResponses[day]++
+    }
+  }
+
+  const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+  let maxDay = 2
+  let maxCount = 0
+  for (const [day, count] of Object.entries(dayResponses)) {
+    if (count > maxCount) {
+      maxCount = count
+      maxDay = parseInt(day)
+    }
+  }
+
+  return dayNames[maxDay]
 }

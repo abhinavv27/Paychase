@@ -1,6 +1,12 @@
+import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
-import { StatCard } from '@/components/analytics/stat-card'
+import { redirect } from 'next/navigation'
 import { Clock, CheckCircle, MessageSquare, Mail, TrendingUp } from 'lucide-react'
+import { StatCard } from '@/components/analytics/stat-card'
+
+export const metadata: Metadata = {
+  title: 'Analytics',
+}
 
 interface PaymentData {
   id: string
@@ -26,46 +32,49 @@ interface ReminderData {
   responded_at: string | null
 }
 
-async function fetchPayments(): Promise<PaymentData[]> {
+async function fetchPayments(userId: string): Promise<PaymentData[]> {
   const supabase = createClient()
+  const twelveMonthsAgo = new Date()
+  twelveMonthsAgo.setFullYear(twelveMonthsAgo.getFullYear() - 1)
   const { data, error } = await supabase
     .from('payments')
     .select('*')
+    .eq('user_id', userId)
+    .gte('captured_at', twelveMonthsAgo.toISOString())
     .order('captured_at', { ascending: false })
 
-  if (error) {
-    console.error('Error fetching payments:', error)
-    return []
-  }
+  if (error) throw error
 
   return data as PaymentData[]
 }
 
-async function fetchInvoices(): Promise<InvoiceData[]> {
+async function fetchInvoices(userId: string): Promise<InvoiceData[]> {
   const supabase = createClient()
+  const twelveMonthsAgo = new Date()
+  twelveMonthsAgo.setFullYear(twelveMonthsAgo.getFullYear() - 1)
   const { data, error } = await supabase
     .from('invoices')
     .select('*')
+    .eq('user_id', userId)
+    .gte('issue_date', twelveMonthsAgo.toISOString())
     .order('issue_date', { ascending: false })
 
-  if (error) {
-    console.error('Error fetching invoices:', error)
-    return []
-  }
+  if (error) throw error
 
   return data as InvoiceData[]
 }
 
-async function fetchReminders(): Promise<ReminderData[]> {
+async function fetchReminders(userId: string): Promise<ReminderData[]> {
   const supabase = createClient()
+  const twelveMonthsAgo = new Date()
+  twelveMonthsAgo.setFullYear(twelveMonthsAgo.getFullYear() - 1)
   const { data, error } = await supabase
     .from('reminders')
     .select('*')
+    .eq('user_id', userId)
+    .gte('created_at', twelveMonthsAgo.toISOString())
 
-  if (error) {
-    console.error('Error fetching reminders:', error)
-    return []
-  }
+  if (error) throw error
 
   return data as ReminderData[]
 }
@@ -139,7 +148,6 @@ function calculateMonthlyTrends(payments: PaymentData[]): { month: string; count
   for (const payment of payments) {
     const date = new Date(payment.captured_at)
     const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
-    const monthName = date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
 
     if (!monthlyData[monthKey]) {
       monthlyData[monthKey] = { count: 0, amount: 0 }
@@ -163,19 +171,86 @@ function calculateMonthlyTrends(payments: PaymentData[]): { month: string; count
 }
 
 export default async function AnalyticsPage() {
-  const payments = await fetchPayments()
-  const invoices = await fetchInvoices()
-  const reminders = await fetchReminders()
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+
+  let fetchError = false
+
+  const [payments, invoices, reminders] = await Promise.all([
+    fetchPayments(user.id).catch((e) => {
+      console.error('Error fetching payments:', e)
+      fetchError = true
+      return [] as PaymentData[]
+    }),
+    fetchInvoices(user.id).catch((e) => {
+      console.error('Error fetching invoices:', e)
+      fetchError = true
+      return [] as InvoiceData[]
+    }),
+    fetchReminders(user.id).catch((e) => {
+      console.error('Error fetching reminders:', e)
+      fetchError = true
+      return [] as ReminderData[]
+    }),
+  ])
+
+  const now = new Date()
+  const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+  const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000)
+
+  // Current period (last 30 days)
+  const currInvoices = invoices.filter(inv => new Date(inv.issue_date) >= thirtyDaysAgo)
+  const currPayments = payments.filter(p => new Date(p.captured_at) >= thirtyDaysAgo)
+  const currTotalRecovered = currPayments.reduce((sum, p) => sum + p.amount, 0)
+
+  // Previous period (30-60 days ago)
+  const prevInvoices = invoices.filter(inv => {
+    const d = new Date(inv.issue_date)
+    return d >= sixtyDaysAgo && d < thirtyDaysAgo
+  })
+  const prevPayments = payments.filter(p => {
+    const d = new Date(p.captured_at)
+    return d >= sixtyDaysAgo && d < thirtyDaysAgo
+  })
+  const prevTotalRecovered = prevPayments.reduce((sum, p) => sum + p.amount, 0)
 
   const dso = calculateDSO(invoices, payments)
+  const currDso = calculateDSO(currInvoices, currPayments)
+  const prevDso = calculateDSO(prevInvoices, prevPayments)
+
   const recoveryRate = calculateRecoveryRate(invoices)
+  const currRecoveryRate = calculateRecoveryRate(currInvoices)
+  const prevRecoveryRate = calculateRecoveryRate(prevInvoices)
+
   const channelEffectiveness = calculateChannelEffectiveness(reminders)
   const monthlyTrends = calculateMonthlyTrends(payments)
 
   const totalRecovered = payments.reduce((sum, p) => sum + p.amount, 0)
 
+  const dsoChange = dso > 0 ? currDso - prevDso : 0
+  const dsoChangeText = dsoChange === 0 ? '0 days' : `${Math.abs(dsoChange)} days`
+  const dsoPositive = dsoChange <= 0
+
+  const rrChange = recoveryRate > 0 ? currRecoveryRate - prevRecoveryRate : 0
+  const rrChangeText = rrChange === 0 ? '0%' : `${Math.abs(rrChange)}%`
+  const rrPositive = rrChange >= 0
+
+  const trChange = totalRecovered > 0 ? currTotalRecovered - prevTotalRecovered : 0
+  const trChangeText = trChange === 0 ? '₹0' : `₹${Math.abs(trChange).toLocaleString('en-IN')}`
+  const trPositive = trChange >= 0
+
   return (
     <div className="space-y-8">
+      {fetchError && (
+        <div className="rounded-lg bg-red-50 border border-red-200 p-4 flex items-center gap-3">
+          <TrendingUp className="w-5 h-5 text-red-500 shrink-0" />
+          <p className="text-sm text-red-700">
+            Some data failed to load. Please try again.
+          </p>
+        </div>
+      )}
+
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Recovery Analytics</h1>
         <p className="mt-1 text-sm text-gray-500">
@@ -188,19 +263,19 @@ export default async function AnalyticsPage() {
         <StatCard
           title="DSO (Days Sales Outstanding)"
           value={`${dso} days`}
-          change={{ value: '0 days', positive: true }}
+          change={{ value: dsoChangeText, positive: dsoPositive }}
           icon={<Clock className="w-5 h-5" />}
         />
         <StatCard
           title="Recovery Rate"
           value={`${recoveryRate}%`}
-          change={{ value: '0%', positive: true }}
+          change={{ value: rrChangeText, positive: rrPositive }}
           icon={<CheckCircle className="w-5 h-5" />}
         />
         <StatCard
           title="Total Recovered"
           value={`₹${totalRecovered.toLocaleString('en-IN')}`}
-          change={{ value: '₹0', positive: true }}
+          change={{ value: trChangeText, positive: trPositive }}
           icon={<TrendingUp className="w-5 h-5" />}
         />
         <StatCard

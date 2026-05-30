@@ -1,21 +1,82 @@
-import { getInvoices, getOverdueInvoices } from '@/lib/invoices'
+import type { Metadata } from 'next'
+import { createClient } from '@/lib/supabase/server'
 import { StatusBadge } from '@/components/invoices/status-badge'
+import { DeleteInvoiceButton } from '@/components/invoices/delete-button'
 import Link from 'next/link'
+import { FileText, Plus } from 'lucide-react'
+import type { Database } from '@/lib/supabase/types'
 
-export default async function InvoicesPage() {
-  const [invoices, overdueInvoices] = await Promise.all([
-    getInvoices(),
-    getOverdueInvoices(),
+export const metadata: Metadata = {
+  title: 'Invoices',
+}
+
+type InvoiceWithClient = Database['public']['Tables']['invoices']['Row'] & {
+  client: { name: string } | null
+}
+
+const PAGE_SIZE = 20
+
+export default async function InvoicesPage({
+  searchParams,
+}: {
+  searchParams: { status?: string; page?: string }
+}) {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) {
+    return <div className="p-8 text-center text-gray-500">You must be logged in to view invoices.</div>
+  }
+
+  const currentPage = Math.max(1, parseInt(searchParams.page || '1', 10) || 1)
+  const statusFilter = searchParams.status || 'all'
+  const today = new Date().toISOString().split('T')[0]
+
+  // Count queries for each status (fast head-only queries)
+  const [allCount, pendingCount, paidCount, overdueCount] = await Promise.all([
+    supabase.from('invoices').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
+    supabase.from('invoices').select('*', { count: 'exact', head: true }).eq('status', 'pending').eq('user_id', user.id),
+    supabase.from('invoices').select('*', { count: 'exact', head: true }).eq('status', 'paid').eq('user_id', user.id),
+    supabase.from('invoices').select('*', { count: 'exact', head: true }).eq('status', 'pending').lt('due_date', today).eq('user_id', user.id),
   ])
 
-  const overdueIds = new Set(overdueInvoices.map((inv) => inv.id))
+  const totalCount = allCount.count || 0
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE))
 
-  const sortedInvoices = [...invoices].sort((a, b) => {
-    const aOverdue = overdueIds.has(a.id) ? 1 : 0
-    const bOverdue = overdueIds.has(b.id) ? 1 : 0
-    if (aOverdue !== bOverdue) return bOverdue - aOverdue
-    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-  })
+  // Data query with pagination and optional filter
+  let query = supabase
+    .from('invoices')
+    .select('*, client:clients(name)')
+    .eq('user_id', user.id)
+
+  if (statusFilter === 'overdue') {
+    query = query.eq('status', 'pending').lt('due_date', today)
+  } else if (statusFilter !== 'all') {
+    query = query.eq('status', statusFilter)
+  }
+
+  const from = (currentPage - 1) * PAGE_SIZE
+  const to = from + PAGE_SIZE - 1
+
+  const { data: invoices } = await query
+    .order('created_at', { ascending: false })
+    .range(from, to)
+
+  const typedInvoices = (invoices || []) as InvoiceWithClient[]
+
+  // Build filter URLs
+  const filterLink = (status: string) => {
+    const params = new URLSearchParams()
+    if (status !== 'all') params.set('status', status)
+    const qs = params.toString()
+    return `/invoices${qs ? `?${qs}` : ''}`
+  }
+
+  const prevPage = currentPage > 1 ? currentPage - 1 : null
+  const nextPage = currentPage < totalPages ? currentPage + 1 : null
+
+  const prevLink = prevPage ? `/invoices?status=${statusFilter}&page=${prevPage}` : null
+  const nextLink = nextPage ? `/invoices?status=${statusFilter}&page=${nextPage}` : null
 
   return (
     <div className="space-y-6">
@@ -43,22 +104,50 @@ export default async function InvoicesPage() {
         </div>
       </div>
 
-      {/* Filters */}
+      {/* Filters + Table */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
         <div className="px-6 py-4 border-b border-gray-200">
           <div className="flex items-center gap-2">
-            <button className="px-3 py-1.5 rounded-lg bg-blue-100 text-blue-700 text-sm font-medium">
-              All ({invoices.length})
-            </button>
-            <button className="px-3 py-1.5 rounded-lg text-gray-600 text-sm font-medium hover:bg-gray-100">
-              Pending ({invoices.filter((inv) => inv.status === 'pending').length})
-            </button>
-            <button className="px-3 py-1.5 rounded-lg text-gray-600 text-sm font-medium hover:bg-gray-100">
-              Paid ({invoices.filter((inv) => inv.status === 'paid').length})
-            </button>
-            <button className="px-3 py-1.5 rounded-lg text-gray-600 text-sm font-medium hover:bg-gray-100">
-              Overdue ({overdueInvoices.length})
-            </button>
+            <Link
+              href={filterLink('all')}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                statusFilter === 'all'
+                  ? 'bg-blue-100 text-blue-700'
+                  : 'text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              All ({allCount.count || 0})
+            </Link>
+            <Link
+              href={filterLink('pending')}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                statusFilter === 'pending'
+                  ? 'bg-blue-100 text-blue-700'
+                  : 'text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              Pending ({pendingCount.count || 0})
+            </Link>
+            <Link
+              href={filterLink('paid')}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                statusFilter === 'paid'
+                  ? 'bg-blue-100 text-blue-700'
+                  : 'text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              Paid ({paidCount.count || 0})
+            </Link>
+            <Link
+              href={filterLink('overdue')}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                statusFilter === 'overdue'
+                  ? 'bg-blue-100 text-blue-700'
+                  : 'text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              Overdue ({overdueCount.count || 0})
+            </Link>
           </div>
         </div>
 
@@ -91,24 +180,33 @@ export default async function InvoicesPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {sortedInvoices.length === 0 ? (
+              {typedInvoices.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
-                    No invoices found. Create your first invoice to get started.
+                  <td colSpan={7}>
+                    <div className="flex flex-col items-center justify-center py-12 text-center">
+                      <FileText className="w-12 h-12 text-gray-300 mb-4" />
+                      <h3 className="text-sm font-medium text-gray-900">No invoices yet</h3>
+                      <p className="text-sm text-gray-500 mt-1">Get started by creating your first invoice.</p>
+                      <Link
+                        href="/invoices/create"
+                        className="mt-4 inline-flex items-center gap-1 px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700"
+                      >
+                        <Plus className="w-4 h-4" />
+                        Create Invoice
+                      </Link>
+                    </div>
                   </td>
                 </tr>
               ) : (
-                sortedInvoices.map((invoice) => {
-                  const displayStatus = overdueIds.has(invoice.id)
-                    ? 'overdue'
-                    : invoice.status
+                typedInvoices.map((invoice) => {
+                  const isOverdue = invoice.status === 'pending' && new Date(invoice.due_date) < new Date(today)
                   return (
                     <tr key={invoice.id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                         {invoice.invoice_number}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                        {(invoice as any).client?.name || 'Unknown'}
+                        {invoice.client?.name || 'Unknown'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                         ₹{invoice.amount.toLocaleString('en-IN')}
@@ -120,7 +218,7 @@ export default async function InvoicesPage() {
                         {new Date(invoice.due_date).toLocaleDateString('en-IN')}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <StatusBadge status={displayStatus} />
+                        <StatusBadge status={isOverdue ? 'overdue' : invoice.status} />
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
                         <Link
@@ -129,9 +227,7 @@ export default async function InvoicesPage() {
                         >
                           Edit
                         </Link>
-                        <button className="text-red-600 hover:text-red-800">
-                          Delete
-                        </button>
+                        <DeleteInvoiceButton invoiceId={invoice.id} />
                       </td>
                     </tr>
                   )
@@ -140,6 +236,35 @@ export default async function InvoicesPage() {
             </tbody>
           </table>
         </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
+            <p className="text-sm text-gray-500">
+              Page {currentPage} of {totalPages}
+            </p>
+            <div className="flex gap-2">
+              {prevLink ? (
+                <Link href={prevLink} className="px-3 py-1.5 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 transition-colors">
+                  Previous
+                </Link>
+              ) : (
+                <span className="px-3 py-1.5 rounded-lg text-sm font-medium text-gray-400 cursor-not-allowed">
+                  Previous
+                </span>
+              )}
+              {nextLink ? (
+                <Link href={nextLink} className="px-3 py-1.5 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 transition-colors">
+                  Next
+                </Link>
+              ) : (
+                <span className="px-3 py-1.5 rounded-lg text-sm font-medium text-gray-400 cursor-not-allowed">
+                  Next
+                </span>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
