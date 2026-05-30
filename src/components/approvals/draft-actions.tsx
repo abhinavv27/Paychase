@@ -1,16 +1,100 @@
 'use client'
 
 import { useFormState } from 'react-dom'
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { approveDraft, dismissDraft } from '@/lib/approvals/actions'
-import { Check, X, Loader2 } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
+import { copyToClipboard } from '@/lib/whatsapp/deep-link'
+import toast from 'react-hot-toast'
+import { Check, X, Loader2, ExternalLink, SendHorizonal } from 'lucide-react'
+
+async function markAsSent(draftId: string): Promise<{ success?: boolean; error?: string }> {
+  const supabase = createClient()
+  const { error } = await supabase
+    .from('reminders')
+    .update({ status: 'sent', approval_status: 'sent' })
+    .eq('id', draftId)
+  if (error) return { error: error.message }
+  return { success: true }
+}
 
 export function ApproveButton({ draftId }: { draftId: string }) {
   const [state, formAction] = useFormState(
-    async (_prev: unknown) => await approveDraft(draftId),
+    async (_prev: unknown) => {
+      const result = await approveDraft(draftId)
+      return result
+    },
     undefined
   )
   const [isPending, setPending] = useState(false)
+  const [confirmed, setConfirmed] = useState(false)
+  const [sending, setSending] = useState(false)
+  const redirectFired = useRef(false)
+
+  useEffect(() => {
+    if (state?.deepLink && !redirectFired.current) {
+      redirectFired.current = true
+
+      const messageText = extractMessageFromDeepLink(state.deepLink)
+      copyToClipboard(messageText).then((ok) => {
+        if (ok) toast.success('Message copied to clipboard as backup')
+        else toast('Tap to copy message', { icon: '📋' })
+      })
+
+      setTimeout(() => {
+        window.location.href = state.deepLink!
+      }, 300)
+    }
+  }, [state?.deepLink])
+
+  if (confirmed) {
+    return (
+      <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+        <div className="flex items-center gap-2">
+          <SendHorizonal className="w-4 h-4 text-blue-600" />
+          <p className="text-sm text-blue-700 font-medium">Marked as sent</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (state?.deepLink) {
+    return (
+      <div className="mt-2 space-y-2">
+        <p className="text-xs text-gray-500">WhatsApp should be open with your message. Did you send it?</p>
+        <div className="flex gap-2">
+          <button
+            onClick={async () => {
+              setSending(true)
+              const result = await markAsSent(draftId)
+              setSending(false)
+              if (result.success) {
+                setConfirmed(true)
+                toast.success('Marked as sent')
+              } else {
+                toast.error(result.error || 'Failed to update')
+              }
+            }}
+            disabled={sending}
+            className="flex items-center gap-1.5 px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-50"
+          >
+            {sending ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Check className="w-4 h-4" />
+            )}
+            I sent it
+          </button>
+          <a
+            href={state.deepLink}
+            className="flex items-center gap-1.5 px-3 py-2 bg-white border border-gray-300 text-gray-700 text-sm rounded-lg hover:bg-gray-50"
+          >
+            <ExternalLink className="w-4 h-4" /> Open WhatsApp
+          </a>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div>
@@ -20,14 +104,8 @@ export function ApproveButton({ draftId }: { draftId: string }) {
       >
         <button
           type="submit"
-          disabled={isPending || !!state?.deepLink}
-          className={`flex items-center gap-1 px-4 py-2 rounded-lg text-sm transition-colors ${
-            isPending
-              ? 'bg-green-400 text-white cursor-not-allowed'
-              : state?.deepLink
-                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                : 'bg-green-600 text-white hover:bg-green-700'
-          }`}
+          disabled={isPending}
+          className="flex items-center gap-1.5 px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:bg-green-400 disabled:cursor-not-allowed transition-colors"
         >
           {isPending ? (
             <><Loader2 className="w-4 h-4 animate-spin" /> Approving...</>
@@ -37,30 +115,18 @@ export function ApproveButton({ draftId }: { draftId: string }) {
         </button>
       </form>
       {state?.error && <p className="text-red-600 text-xs mt-2">{state.error}</p>}
-      {state?.deepLink && (
-        <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
-          <p className="text-sm text-green-700 font-medium">Draft approved!</p>
-          <p className="text-xs text-green-600 mt-1">Open WhatsApp to send this message:</p>
-          <div className="mt-2 flex gap-2">
-            <a
-              href={state.deepLink}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 px-3 py-1.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700"
-            >
-              Open WhatsApp
-            </a>
-            <button
-              onClick={() => state.deepLink && navigator.clipboard.writeText(state.deepLink)}
-              className="inline-flex items-center gap-1 px-3 py-1.5 bg-white border border-gray-300 text-gray-700 text-sm rounded-lg hover:bg-gray-50"
-            >
-              Copy Link
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   )
+}
+
+function extractMessageFromDeepLink(link: string): string {
+  try {
+    const parsed = new URL(link)
+    const text = parsed.searchParams.get('text')
+    return text ? decodeURIComponent(text) : ''
+  } catch {
+    return ''
+  }
 }
 
 export function DismissButton({ draftId }: { draftId: string }) {
